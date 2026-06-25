@@ -2,22 +2,37 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#ffffff" />
-  <title>Recall</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#ffffff" id="theme-color" />
+  <meta name="description" content="Recall — a minimalist memory game. Memorize the pattern, tap it back." />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Recall" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icons/icon-180.png" />
+  <link rel="icon" href="icons/icon-192.png" />
   <link rel="stylesheet" href="style.css" />
+  <title>Recall</title>
 </head>
 <body>
   <main class="app">
+    <!-- ===== Top bar ===== -->
     <header class="topbar">
+      <button class="icon-btn" id="back-btn" aria-label="Back to menu" hidden>
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
       <h1 class="wordmark">Recall</h1>
-      <button class="reset" id="reset" aria-label="Restart game" title="Restart">Restart</button>
+      <button class="icon-btn" id="theme-btn" aria-label="Toggle theme">
+        <svg class="ico-sun" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="2"/><g stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M5.2 5.2l1.7 1.7M17.1 17.1l1.7 1.7M18.8 5.2l-1.7 1.7M6.9 17.1l-1.7 1.7"/></g></svg>
+        <svg class="ico-moon" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+      </button>
     </header>
 
-    <section class="stats" aria-live="polite">
+    <!-- ===== In-game HUD ===== -->
+    <section class="hud" id="hud" hidden aria-live="polite">
       <div class="stat">
-        <span class="stat-value" id="level">1</span>
-        <span class="stat-label">Level</span>
+        <span class="stat-value" id="stat-primary">1</span>
+        <span class="stat-label" id="label-primary">Level</span>
       </div>
       <div class="stat">
         <span class="stat-value" id="score">0</span>
@@ -29,6 +44,9 @@
       </div>
     </section>
 
+    <div class="combo" id="combo" hidden><span id="combo-x">×2</span> combo</div>
+
+    <!-- ===== Board ===== -->
     <section class="board-wrap">
       <div class="board" id="board" role="grid" aria-label="Memory grid"></div>
       <div class="lives" id="lives" aria-label="Lives"></div>
@@ -36,17 +54,138 @@
 
     <p class="prompt" id="prompt">Memorize the tiles.</p>
 
-    <!-- Overlay for start / win / lose states -->
-    <div class="overlay" id="overlay">
-      <div class="overlay-card">
-        <h2 class="overlay-title" id="overlay-title">Recall</h2>
-        <p class="overlay-text" id="overlay-text">
-          A pattern of tiles will flash for a moment.<br />
-          Tap every tile you saw. One miss costs a life.
-        </p>
-        <button class="cta" id="cta">Start</button>
+    <!-- ===== Home screen ===== -->
+    <section class="screen" id="home-screen">
+      <div class="screen-inner">
+        <div class="hero">
+          <div class="hero-mark" id="hero-mark" aria-hidden="true"></div>
+          <h2 class="hero-title">Recall</h2>
+          <p class="hero-sub">Memory, beautifully simple.</p>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Mode</label>
+          <div class="segmented" id="mode-seg" data-store="mode" style="--count:3;--idx:0;" role="tablist">
+            <span class="thumb"></span>
+            <button class="seg is-active" data-value="endless" role="tab">Endless</button>
+            <button class="seg" data-value="sprint" role="tab">Sprint</button>
+            <button class="seg" data-value="daily" role="tab">Daily</button>
+          </div>
+          <p class="field-hint" id="mode-hint">Clear boards forever. Three lives.</p>
+        </div>
+
+        <button class="cta" id="play-btn">Play</button>
+
+        <nav class="home-nav">
+          <button class="link-btn" id="open-stats">Stats</button>
+          <button class="link-btn" id="open-settings">Settings</button>
+          <button class="link-btn" id="open-help">How to play</button>
+        </nav>
       </div>
-    </div>
+    </section>
+
+    <!-- ===== Settings screen ===== -->
+    <section class="screen" id="settings-screen" hidden>
+      <div class="screen-inner">
+        <h2 class="screen-title">Settings</h2>
+
+        <div class="field">
+          <label class="field-label">Difficulty</label>
+          <div class="segmented" id="diff-seg" data-store="difficulty" style="--count:3;--idx:1;">
+            <span class="thumb"></span>
+            <button class="seg" data-value="casual">Casual</button>
+            <button class="seg is-active" data-value="standard">Standard</button>
+            <button class="seg" data-value="hard">Hard</button>
+          </div>
+          <p class="field-hint" id="diff-hint">Balanced flash time. Three lives.</p>
+        </div>
+
+        <div class="row-toggle">
+          <span class="row-label">Sound</span>
+          <button class="switch is-on" id="sound-toggle" role="switch" aria-checked="true" aria-label="Sound"><span class="knob"></span></button>
+        </div>
+        <div class="row-toggle">
+          <span class="row-label">Haptics</span>
+          <button class="switch is-on" id="haptics-toggle" role="switch" aria-checked="true" aria-label="Haptics"><span class="knob"></span></button>
+        </div>
+        <div class="row-toggle">
+          <span class="row-label">Theme</span>
+          <div class="segmented small" id="theme-seg" data-store="theme" style="--count:3;--idx:0;">
+            <span class="thumb"></span>
+            <button class="seg is-active" data-value="system">Auto</button>
+            <button class="seg" data-value="light">Light</button>
+            <button class="seg" data-value="dark">Dark</button>
+          </div>
+        </div>
+
+        <button class="cta ghost" data-close>Done</button>
+      </div>
+    </section>
+
+    <!-- ===== Stats screen ===== -->
+    <section class="screen" id="stats-screen" hidden>
+      <div class="screen-inner">
+        <h2 class="screen-title">Stats</h2>
+        <div class="stat-grid">
+          <div class="stat-card"><span class="big" id="s-games">0</span><span class="cap">Games</span></div>
+          <div class="stat-card"><span class="big" id="s-acc">—</span><span class="cap">Accuracy</span></div>
+          <div class="stat-card"><span class="big" id="s-level">0</span><span class="cap">Best level</span></div>
+          <div class="stat-card"><span class="big" id="s-streak">0</span><span class="cap">Best combo</span></div>
+        </div>
+
+        <div class="spark-wrap">
+          <div class="spark-head"><span>Recent scores</span></div>
+          <svg class="spark" id="spark" viewBox="0 0 300 80" preserveAspectRatio="none" aria-hidden="true"></svg>
+        </div>
+
+        <ul class="best-list">
+          <li><span>Endless best</span><b id="best-endless">0</b></li>
+          <li><span>Sprint best</span><b id="best-sprint">0</b></li>
+          <li><span>Daily best</span><b id="best-daily">0</b></li>
+        </ul>
+
+        <button class="link-btn danger" id="reset-stats">Reset stats</button>
+        <button class="cta ghost" data-close>Done</button>
+      </div>
+    </section>
+
+    <!-- ===== Help screen ===== -->
+    <section class="screen" id="help-screen" hidden>
+      <div class="screen-inner">
+        <h2 class="screen-title">How to play</h2>
+        <ol class="help-list">
+          <li>A pattern of tiles flashes for a moment.</li>
+          <li>When it fades, tap every tile you saw.</li>
+          <li>Clear the board to advance — each one is a little harder.</li>
+          <li>Clear a board with no misses to build a <b>combo</b> multiplier.</li>
+          <li>A wrong tap costs a life. Lose them all and the run ends.</li>
+        </ol>
+        <p class="help-modes">
+          <b>Endless</b> — go as far as you can.<br />
+          <b>Sprint</b> — most points in 60 seconds; misses cost time.<br />
+          <b>Daily</b> — everyone gets the same boards each day.
+        </p>
+        <button class="cta ghost" data-close>Got it</button>
+      </div>
+    </section>
+
+    <!-- ===== End screen ===== -->
+    <section class="screen" id="end-screen" hidden>
+      <div class="screen-inner">
+        <p class="end-kicker" id="end-kicker">Game over</p>
+        <h2 class="end-score" id="end-score">0</h2>
+        <p class="end-detail" id="end-detail">Level 1</p>
+        <p class="end-best" id="end-best" hidden>New personal best</p>
+        <div class="end-actions">
+          <button class="cta" id="again-btn">Play again</button>
+          <button class="link-btn" id="share-btn">Share result</button>
+          <button class="link-btn" id="end-home">Home</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Hidden canvas for share-card rendering -->
+    <canvas id="share-canvas" width="1080" height="1350" hidden></canvas>
   </main>
 
   <script src="game.js"></script>
