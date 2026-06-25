@@ -512,6 +512,10 @@
 
   function onTileClick(index, tile) {
     if (state.locked || !state.playing || state.found.has(index)) return;
+    // Belt-and-suspenders against a stray double pointerdown on one press:
+    // never process a tile that's already shown its result this round.
+    if (tile.classList.contains("wrong") || tile.classList.contains("correct"))
+      return;
 
     tile.classList.add("tap");
     setTimeout(() => tile.classList.remove("tap"), 300);
@@ -728,7 +732,8 @@
   /* ============================================================
      Timer (Sprint)
      ============================================================ */
-  let timerPaused = false;
+  let timerPaused = false; // paused for a flash / peek reveal
+  let tabHidden = false; // paused because the tab/app is backgrounded
   let timerSpan = null;
 
   function startTimer() {
@@ -740,9 +745,12 @@
 
     const tick = (now) => {
       if (!state.playing) return;
-      const dt = timerPaused ? 0 : (now - last) / 1000;
+      const paused = timerPaused || tabHidden;
+      // Clamp dt: while backgrounded rAF stalls, so the first frame back could
+      // otherwise carry the entire hidden duration and drain the clock at once.
+      const dt = paused ? 0 : Math.min((now - last) / 1000, 0.25);
       last = now;
-      if (!timerPaused) {
+      if (!paused) {
         state.timeLeft = Math.max(0, state.timeLeft - dt);
         const display = Math.ceil(state.timeLeft);
         if (display !== prevDisplay) {
@@ -1288,9 +1296,10 @@
     }
   });
 
-  // Pause an active timed game if the tab is hidden.
+  // Freeze the Sprint clock while the tab/app is backgrounded, and resume it on
+  // return. (Kept separate from flash/peek pausing so the two never collide.)
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden && state.playing && MODES[state.mode].timed) pauseTimer();
+    tabHidden = document.hidden;
   });
 
   /* ============================================================
