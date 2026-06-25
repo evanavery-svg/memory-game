@@ -229,11 +229,13 @@ body {
   border: 1px solid var(--tile-edge);
   cursor: pointer;
   padding: 0;
-  transition: transform 0.3s var(--ease), background 0.3s var(--ease),
-    border-color 0.3s var(--ease);
+  transition: transform 0.3s var(--ease), background 0.18s var(--ease),
+    border-color 0.18s var(--ease);
 }
 
-.board.interactive .tile {
+/* Only the tile being pressed gets promoted — avoids a layer per tile. */
+.tile.tap,
+.tile.lit {
   will-change: transform;
 }
 
@@ -245,8 +247,13 @@ body {
   to { opacity: 1; transform: scale(1); }
 }
 
-.board.interactive .tile:hover {
-  background: var(--tile-hover);
+/* Hover only on devices that truly hover (mouse), and never on a tile that has
+   already resolved — otherwise a sticky touch :hover paints gray over the
+   white/black result until you tap elsewhere. */
+@media (hover: hover) {
+  .board.interactive .tile:not(.correct):not(.wrong):not(.lit):hover {
+    background: var(--tile-hover);
+  }
 }
 
 .tile.lit {
@@ -605,6 +612,35 @@ body {
 .link-btn.danger {
   display: block;
   margin: 4px auto 14px;
+}
+
+/* ---------- Home quote ---------- */
+.quote {
+  margin: 30px auto 0;
+  max-width: 300px;
+  text-align: center;
+  min-height: 56px;
+  transition: opacity 0.6s var(--ease);
+}
+.quote.fade {
+  opacity: 0;
+}
+.quote blockquote {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.5;
+  font-style: italic;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  opacity: 0.78;
+}
+.quote figcaption {
+  margin-top: 7px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 /* ---------- Stats screen ---------- */

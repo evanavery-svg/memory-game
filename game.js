@@ -456,7 +456,8 @@
       tile.style.animationDelay = `${i * 10}ms`;
       tile.dataset.index = String(i);
       tile.setAttribute("role", "gridcell");
-      tile.addEventListener("click", () => onTileClick(i, tile));
+      // pointerdown (not click) fires the instant a finger lands — no tap delay.
+      tile.addEventListener("pointerdown", () => onTileClick(i, tile));
       boardEl.appendChild(tile);
     }
   }
@@ -1327,10 +1328,52 @@
     cycle();
     setInterval(cycle, 1400);
 
+    startQuotes();
+
     // Idle board behind the home screen.
     buildBoard(3);
     showScreen("home");
   }
+
+  /* ============================================================
+     Home quotes — a little inspiration on memory & the mind
+     ============================================================ */
+  const QUOTES = [
+    { t: "Memory is the treasury and guardian of all things.", by: "Cicero" },
+    { t: "The true art of memory is the art of attention.", by: "Samuel Johnson" },
+    { t: "We are our memory, we are that chimerical museum of shifting shapes.", by: "Jorge Luis Borges" },
+    { t: "Memory is the diary we all carry about with us.", by: "Oscar Wilde" },
+    { t: "A mind that is stretched by a new experience can never go back to its old dimensions.", by: "Oliver Wendell Holmes" },
+    { t: "The palest ink is better than the best memory — so train the best memory.", by: "Proverb, adapted" },
+    { t: "Practice does not make perfect. Perfect practice makes perfect.", by: "Vince Lombardi" },
+    { t: "The things we remember best are the things best forgotten.", by: "Baltasar Gracián" },
+    { t: "Attention is the rarest and purest form of generosity.", by: "Simone Weil" },
+    { t: "Nothing fixes a thing so intensely in the memory as the wish to forget it.", by: "Montaigne" },
+  ];
+  function startQuotes() {
+    const fig = $("home-quote");
+    const txt = $("quote-text");
+    const by = $("quote-by");
+    if (!fig || !txt || !by) return;
+    let i = Math.floor(Math.random() * QUOTES.length);
+    const paint = () => {
+      const q = QUOTES[i % QUOTES.length];
+      txt.textContent = "“" + q.t + "”";
+      by.textContent = q.by;
+    };
+    paint();
+    setInterval(() => {
+      // Only rotate while the home screen is actually visible.
+      if (screens.home.hidden) return;
+      fig.classList.add("fade");
+      setTimeout(() => {
+        i++;
+        paint();
+        fig.classList.remove("fade");
+      }, 600);
+    }, 7000);
+  }
+
   init();
 
   /* ============================================================
