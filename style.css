@@ -295,12 +295,6 @@ body {
   75% { transform: translateX(5px); }
 }
 
-.tile.tap {
-  animation: tap 0.3s var(--ease);
-}
-@keyframes tap {
-  50% { transform: scale(0.9); }
-}
 
 /* ---------- Lives / timer ---------- */
 .lives {

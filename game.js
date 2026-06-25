@@ -517,9 +517,6 @@
     if (tile.classList.contains("wrong") || tile.classList.contains("correct"))
       return;
 
-    tile.classList.add("tap");
-    setTimeout(() => tile.classList.remove("tap"), 300);
-
     state.taps++;
     if (state.target.has(index)) {
       state.hits++;
