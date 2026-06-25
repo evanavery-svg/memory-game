@@ -117,10 +117,10 @@ body {
   cursor: pointer;
   border-radius: 50%;
   margin: -8px;
-  transition: background 0.2s var(--ease), transform 0.2s var(--spring);
+  transition: background 0.2s var(--ease), transform 0.14s var(--ease);
 }
 .icon-btn:active {
-  transform: scale(0.88);
+  transform: scale(0.92);
 }
 .icon-btn[hidden] {
   display: none;
@@ -476,7 +476,7 @@ body {
   background: var(--bg);
   box-shadow: 0 2px 8px var(--shadow);
   transform: translateX(calc(var(--idx) * 100%));
-  transition: transform 0.42s var(--spring);
+  transition: transform 0.28s var(--ease);
 }
 .segmented .seg {
   position: relative;
@@ -554,7 +554,7 @@ body {
   border-radius: 50%;
   background: #fff;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
-  transition: transform 0.3s var(--spring);
+  transition: transform 0.24s var(--ease);
 }
 .switch.is-on .knob {
   transform: translateX(21px);
@@ -574,7 +574,7 @@ body {
   border-radius: 16px;
   cursor: pointer;
   letter-spacing: -0.01em;
-  transition: transform 0.25s var(--spring), opacity 0.2s var(--ease);
+  transition: transform 0.14s var(--ease), opacity 0.14s var(--ease);
 }
 .cta:active {
   transform: scale(0.97);
@@ -831,9 +831,9 @@ body {
   border-radius: 100px;
   cursor: pointer;
   letter-spacing: -0.01em;
-  transition: transform 0.2s var(--spring), opacity 0.2s var(--ease),
+  transition: transform 0.14s var(--ease), opacity 0.2s var(--ease),
     background 0.2s var(--ease);
-  animation: powerIn 0.3s var(--spring);
+  animation: powerIn 0.3s var(--ease);
 }
 .power[hidden] {
   display: none;
