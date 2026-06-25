@@ -407,30 +407,37 @@
     return s + "s";
   }
   function bump(el) {
-    el.classList.remove("bump");
-    void el.offsetWidth;
-    el.classList.add("bump");
+    el.animate(
+      [{ transform: "scale(1)" }, { transform: "scale(1.18)" }, { transform: "scale(1)" }],
+      { duration: 500, easing: "cubic-bezier(0.34, 1.56, 0.64, 1)" }
+    );
   }
   function renderCombo() {
     if (state.combo >= 2) {
       comboEl.hidden = false;
       comboX.textContent = "×" + state.combo;
-      comboEl.classList.remove("pulse");
-      void comboEl.offsetWidth;
-      comboEl.classList.add("pulse");
+      comboX.animate(
+        [{ transform: "scale(1)" }, { transform: "scale(1.5)" }, { transform: "scale(1)" }],
+        { duration: 450, easing: "cubic-bezier(0.34, 1.56, 0.64, 1)" }
+      );
     } else {
       comboEl.hidden = true;
     }
   }
   function renderLives() {
-    livesEl.innerHTML = "";
     if (MODES[state.mode].timed) {
-      const t = document.createElement("span");
-      t.className = "timer" + (state.timeLeft <= 10 ? " low" : "");
-      t.textContent = fmtTime(state.timeLeft);
-      livesEl.appendChild(t);
+      const s = Math.max(0, Math.ceil(state.timeLeft));
+      if (!timerSpan || timerSpan.parentNode !== livesEl) {
+        livesEl.innerHTML = "";
+        timerSpan = document.createElement("span");
+        livesEl.appendChild(timerSpan);
+      }
+      timerSpan.className = "timer" + (s <= 10 ? " low" : "");
+      timerSpan.textContent = fmtTime(s);
       return;
     }
+    timerSpan = null;
+    livesEl.innerHTML = "";
     for (let i = 0; i < state.maxLives; i++) {
       const dot = document.createElement("span");
       dot.className = "life" + (i >= state.lives ? " lost" : "");
@@ -518,7 +525,7 @@
     } else {
       tile.classList.add("wrong");
       sfx.wrong();
-      missed();
+      missed(tile);
     }
   }
 
@@ -581,7 +588,7 @@
     );
   }
 
-  function missed() {
+  function missed(wrongTile) {
     state.roundMisses = (state.roundMisses || 0) + 1;
     // A miss breaks the combo.
     if (state.combo > 1) {
@@ -597,8 +604,7 @@
       promptEl.textContent = `−${MODES[state.mode].wrongPenalty}s`;
       state.locked = true;
       setTimeout(() => {
-        const w = boardEl.querySelector(".tile.wrong");
-        if (w) w.classList.remove("wrong");
+        wrongTile.classList.remove("wrong");
         if (state.playing && state.timeLeft > 0) {
           promptEl.textContent = `Tap ${state.target.size - state.found.size} more`;
           state.locked = false;
@@ -617,8 +623,7 @@
     promptEl.textContent =
       state.lives === 1 ? "Last life — careful" : "Missed one";
     setTimeout(() => {
-      const w = boardEl.querySelector(".tile.wrong");
-      if (w) w.classList.remove("wrong");
+      wrongTile.classList.remove("wrong");
       if (state.playing && state.lives > 0) {
         promptEl.textContent = `Tap ${state.target.size - state.found.size} more`;
         state.locked = false;
@@ -723,32 +728,42 @@
      Timer (Sprint)
      ============================================================ */
   let timerPaused = false;
+  let timerSpan = null;
+
   function startTimer() {
     state.timeLeft = MODES[state.mode].duration;
     timerPaused = false;
+    timerSpan = null;
     let last = performance.now();
-    clearInterval(state.timerId);
-    state.timerId = setInterval(() => {
-      const now = performance.now();
-      const dt = (now - last) / 1000;
+    let prevDisplay = -1;
+
+    const tick = (now) => {
+      if (!state.playing) return;
+      const dt = timerPaused ? 0 : (now - last) / 1000;
       last = now;
-      if (timerPaused || !state.playing) return;
-      const prev = Math.ceil(state.timeLeft);
-      state.timeLeft -= dt;
-      const cur = Math.ceil(state.timeLeft);
-      if (cur !== prev && cur <= 5 && cur > 0) sfx.tick();
-      renderLives();
-      renderHUD();
-      if (state.timeLeft <= 0) {
-        state.timeLeft = 0;
-        gameOver();
+      if (!timerPaused) {
+        state.timeLeft = Math.max(0, state.timeLeft - dt);
+        const display = Math.ceil(state.timeLeft);
+        if (display !== prevDisplay) {
+          prevDisplay = display;
+          if (display <= 5 && display > 0) sfx.tick();
+          renderLives();
+          renderHUD();
+          if (state.timeLeft <= 0) {
+            gameOver();
+            return;
+          }
+        }
       }
-    }, 100);
+      state.timerId = requestAnimationFrame(tick);
+    };
+    if (state.timerId) cancelAnimationFrame(state.timerId);
+    state.timerId = requestAnimationFrame(tick);
   }
-  const pauseTimer = () => (timerPaused = true);
-  const resumeTimer = () => (timerPaused = false);
+  const pauseTimer = () => { timerPaused = true; };
+  const resumeTimer = () => { timerPaused = false; };
   function stopTimer() {
-    clearInterval(state.timerId);
+    if (state.timerId) cancelAnimationFrame(state.timerId);
     state.timerId = null;
   }
 
