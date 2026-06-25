@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#ffffff" />
+  <title>Recall</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <h1 class="wordmark">Recall</h1>
+      <button class="reset" id="reset" aria-label="Restart game" title="Restart">Restart</button>
+    </header>
+
+    <section class="stats" aria-live="polite">
+      <div class="stat">
+        <span class="stat-value" id="level">1</span>
+        <span class="stat-label">Level</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value" id="score">0</span>
+        <span class="stat-label">Score</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value" id="best">0</span>
+        <span class="stat-label">Best</span>
+      </div>
+    </section>
+
+    <section class="board-wrap">
+      <div class="board" id="board" role="grid" aria-label="Memory grid"></div>
+      <div class="lives" id="lives" aria-label="Lives"></div>
+    </section>
+
+    <p class="prompt" id="prompt">Memorize the tiles.</p>
+
+    <!-- Overlay for start / win / lose states -->
+    <div class="overlay" id="overlay">
+      <div class="overlay-card">
+        <h2 class="overlay-title" id="overlay-title">Recall</h2>
+        <p class="overlay-text" id="overlay-text">
+          A pattern of tiles will flash for a moment.<br />
+          Tap every tile you saw. One miss costs a life.
+        </p>
+        <button class="cta" id="cta">Start</button>
+      </div>
+    </div>
+  </main>
+
+  <script src="game.js"></script>
+</body>
+</html>
