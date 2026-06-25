@@ -1,5 +1,5 @@
 /* Recall service worker — offline-first caching */
-const CACHE = "recall-v1";
+const CACHE = "recall-v2";
 const ASSETS = [
   "./",
   "./index.html",

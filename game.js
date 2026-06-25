@@ -18,6 +18,13 @@
   const backBtn = $("back-btn");
   const themeBtn = $("theme-btn");
   const themeColorMeta = $("theme-color");
+  const powerupsEl = $("powerups");
+  const peekBtn = $("power-peek");
+  const skipBtn = $("power-skip");
+  const peekN = $("peek-n");
+  const skipN = $("skip-n");
+  const checkpointEl = $("checkpoint");
+  const toastEl = $("toast");
 
   const screens = {
     home: $("home-screen"),
@@ -53,9 +60,17 @@
       bestCombo: 0,
       best: { endless: 0, sprint: 0, daily: 0 },
       recent: [],
+      streak: { current: 0, longest: 0, last: null },
+      playDays: [], // ["YYYY-MM-DD", ...]
+      achievements: [], // unlocked ids
     },
     readJSON(STATS_KEY, {})
   );
+  // Backfill nested defaults for older saves.
+  stats.streak = Object.assign({ current: 0, longest: 0, last: null }, stats.streak);
+  stats.best = Object.assign({ endless: 0, sprint: 0, daily: 0 }, stats.best);
+  if (!Array.isArray(stats.playDays)) stats.playDays = [];
+  if (!Array.isArray(stats.achievements)) stats.achievements = [];
 
   function readJSON(key, fallback) {
     try {
@@ -114,6 +129,9 @@
     rng: Math.random,
     timeLeft: 0,
     timerId: null,
+    peek: 0,
+    skip: 0,
+    usedSkip: false,
   };
 
   /* ============================================================
@@ -132,6 +150,129 @@
   function dailySeed() {
     const d = new Date();
     return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+  }
+
+  /* ============================================================
+     Dates & streaks
+     ============================================================ */
+  function dateKey(d) {
+    // Local calendar date as YYYY-MM-DD.
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+  const todayKey = () => dateKey(new Date());
+  function daysBetween(aKey, bKey) {
+    const a = new Date(aKey + "T00:00:00");
+    const b = new Date(bKey + "T00:00:00");
+    return Math.round((b - a) / 86400000);
+  }
+
+  // Called when a game begins — records today as played and advances the streak.
+  function registerPlay() {
+    const today = todayKey();
+    const s = stats.streak;
+    if (s.last === today) {
+      // already counted today
+    } else if (s.last && daysBetween(s.last, today) === 1) {
+      s.current += 1; // consecutive day
+    } else {
+      s.current = 1; // first play, or a gap broke the streak
+    }
+    s.last = today;
+    s.longest = Math.max(s.longest, s.current);
+    if (!stats.playDays.includes(today)) stats.playDays.push(today);
+    // Keep the play-day log bounded (~1 year).
+    if (stats.playDays.length > 400) stats.playDays = stats.playDays.slice(-400);
+    saveStats();
+  }
+
+  /* ============================================================
+     Achievements
+     ============================================================ */
+  const ICONS = {
+    flag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>',
+    bolt: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L4 14h6l-1 8 9-12h-6z"/></svg>',
+    star: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l2.6 5.6 6.1.7-4.5 4.1 1.2 6L12 16.9 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z"/></svg>',
+    target:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>',
+    crown:
+      '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 7l4 4 5-7 5 7 4-4-2 12H5z"/></svg>',
+    flame:
+      '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c1 4-3 5-3 9a3 3 0 006 0c0-1-.5-2-1-2.5.3 2-1.2 2.5-1.2 2.5C13 9 16 8 12 2z"/><path d="M8.5 13a3.5 3.5 0 107 0c0 4-3.5 5-3.5 8-0 0-3.5-1-3.5-8z" opacity="0.45"/></svg>',
+    medal:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="15" r="6"/><path d="M9 4l3 5 3-5"/></svg>',
+    trophy:
+      '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4h10v3a5 5 0 01-10 0zM5 4h2v2a3 3 0 01-2-3zM17 4h2a3 3 0 01-2 3zM10 13h4l1 3h-6zM8 18h8v2H8z"/></svg>',
+    infinity:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 12c0-2-1.5-3.5-3-3.5S2 10 2 12s1.5 3.5 3 3.5 3-1.5 4-3.5 2.5-3.5 4-3.5 3 1.5 3 3.5-1.5 3.5-3 3.5-3-1.5-4-3.5"/></svg>',
+  };
+
+  const ACHIEVEMENTS = [
+    { id: "first", name: "First Steps", icon: "flag", test: (c) => c.gamesPlayed >= 1 },
+    { id: "combo5", name: "Sharp", icon: "bolt", test: (c) => c.bestCombo >= 5 },
+    { id: "combo9", name: "Flawless", icon: "star", test: (c) => c.bestCombo >= 9 },
+    { id: "level10", name: "Double Digits", icon: "medal", test: (c) => c.bestLevel >= 10 },
+    { id: "level15", name: "Mastermind", icon: "crown", test: (c) => c.bestLevel >= 15 },
+    { id: "sprintClean", name: "Marksman", icon: "target", test: (c) => c.cleanSprint },
+    { id: "score500", name: "High Roller", icon: "trophy", test: (c) => c.bestSingle >= 500 },
+    { id: "streak7", name: "Dedicated", icon: "flame", test: (c) => c.streak.longest >= 7 },
+    { id: "games25", name: "Persistent", icon: "infinity", test: (c) => c.gamesPlayed >= 25 },
+  ];
+
+  function checkAchievements(extra = {}) {
+    const ctx = Object.assign(
+      {
+        gamesPlayed: stats.gamesPlayed,
+        bestCombo: stats.bestCombo,
+        bestLevel: stats.bestLevel,
+        streak: stats.streak,
+        bestSingle: Math.max(0, ...stats.recent, ...Object.values(stats.best)),
+      },
+      extra
+    );
+    let changed = false;
+    for (const a of ACHIEVEMENTS) {
+      if (stats.achievements.includes(a.id)) continue;
+      if (a.test(ctx)) {
+        stats.achievements.push(a.id);
+        changed = true;
+        showToast(a);
+      }
+    }
+    if (changed) saveStats();
+  }
+
+  let toastTimer = null;
+  const toastQueue = [];
+  let toastShowing = false;
+  function showToast(a) {
+    toastQueue.push(a);
+    if (!toastShowing) nextToast();
+  }
+  function nextToast() {
+    const a = toastQueue.shift();
+    if (!a) {
+      toastShowing = false;
+      return;
+    }
+    toastShowing = true;
+    $("toast-icon").innerHTML = ICONS[a.icon] || "";
+    $("toast-title").textContent = a.name;
+    $("toast-sub").textContent = "Achievement unlocked";
+    toastEl.classList.remove("out");
+    toastEl.hidden = false;
+    sfx.unlock();
+    vibrate([10, 30, 10]);
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      toastEl.classList.add("out");
+      setTimeout(() => {
+        toastEl.hidden = true;
+        nextToast();
+      }, 400);
+    }, 2200);
   }
 
   /* ============================================================
@@ -187,6 +328,17 @@
       vibrate([30, 60, 30]);
     },
     tick: () => tone(880, 0.05, { gain: 0.04 }),
+    unlock: () => {
+      tone(659.25, 0.1, { gain: 0.05 });
+      setTimeout(() => tone(987.77, 0.16, { gain: 0.05 }), 70);
+    },
+    checkpoint: () => {
+      tone(523.25, 0.1, { gain: 0.05 });
+      setTimeout(() => tone(784, 0.1, { gain: 0.05 }), 80);
+      setTimeout(() => tone(1046.5, 0.22, { gain: 0.05 }), 160);
+      vibrate([12, 40, 12]);
+    },
+    power: () => tone(700, 0.12, { type: "triangle", gain: 0.05 }),
   };
 
   /* ============================================================
@@ -319,6 +471,9 @@
     const { gridSize, lit, flashMs } = boardSpec(state.level);
     state.locked = true;
     state.found = new Set();
+    state.usedSkip = false;
+    state.usedPeek = false;
+    hidePowerups();
 
     buildBoard(gridSize);
     state.target = sample(gridSize * gridSize, lit);
@@ -344,6 +499,7 @@
     }`;
     boardEl.classList.add("interactive");
     state.locked = false;
+    renderPowerups();
   }
 
   function onTileClick(index, tile) {
@@ -369,11 +525,15 @@
   function roundWon() {
     state.locked = true;
     boardEl.classList.remove("interactive");
+    hidePowerups();
     sfx.win();
 
-    const perfect = state.roundMisses === 0;
+    // A board only grows the combo if it was cleared cleanly and unaided.
+    const perfect = state.roundMisses === 0 && !state.usedSkip && !state.usedPeek;
+    let granted = false;
     if (perfect) {
       state.combo = Math.min(state.combo + 1, 9);
+      granted = earnPowerups(state.combo);
     }
     state.bestCombo = Math.max(state.bestCombo, state.combo);
 
@@ -381,28 +541,44 @@
     const gained = Math.round(base * state.combo);
     state.score += gained;
 
-    if (MODES[state.mode].timed) {
-      // Reward speed: small time bonus for a clean board.
-      if (perfect) state.timeLeft += 1.5;
-    }
+    if (MODES[state.mode].timed && perfect) state.timeLeft += 1.5;
 
     state.level += 1;
     state.roundMisses = 0;
+    state.usedSkip = false;
+    state.usedPeek = false;
 
     if (state.score > (stats.best[state.mode] || 0)) {
       stats.best[state.mode] = state.score;
       bump(bestEl);
     }
+
+    // Live stats so achievements can pop mid-run.
+    stats.bestCombo = Math.max(stats.bestCombo, state.bestCombo);
+    stats.bestLevel = Math.max(stats.bestLevel, state.level);
+    checkAchievements({ bestSingle: state.score });
+
     renderHUD();
     bump(scoreEl);
     bump(primaryEl);
     renderCombo();
 
-    promptEl.textContent =
-      state.combo >= 2 ? `Perfect · ×${state.combo}` : "Perfect";
-    setTimeout(() => {
-      if (state.playing) startRound();
-    }, 820);
+    // Level-up checkpoint every 5 levels.
+    const checkpoint = state.level % 5 === 0;
+    if (checkpoint) showCheckpoint(state.level);
+
+    if (granted) {
+      promptEl.textContent = "Power-up earned";
+    } else {
+      promptEl.textContent =
+        state.combo >= 2 ? `Perfect · ×${state.combo}` : "Perfect";
+    }
+    setTimeout(
+      () => {
+        if (state.playing) startRound();
+      },
+      checkpoint ? 1450 : 820
+    );
   }
 
   function missed() {
@@ -448,6 +624,99 @@
         state.locked = false;
       }
     }, 700);
+  }
+
+  /* ============================================================
+     Power-ups (earned by combos)
+     ============================================================ */
+  // Grant tokens as the combo crosses thresholds. Returns true if any granted.
+  function earnPowerups(combo) {
+    let granted = false;
+    if (combo === 3) {
+      state.peek++;
+      granted = true;
+    } else if (combo === 5) {
+      state.skip++;
+      granted = true;
+    } else if (combo === 7) {
+      state.peek++;
+      state.skip++;
+      granted = true;
+    }
+    return granted;
+  }
+
+  function renderPowerups() {
+    peekBtn.hidden = state.peek <= 0;
+    skipBtn.hidden = state.skip <= 0;
+    peekN.textContent = state.peek;
+    skipN.textContent = state.skip;
+    const show = !state.locked && state.playing && (state.peek > 0 || state.skip > 0);
+    powerupsEl.hidden = !show;
+  }
+  function hidePowerups() {
+    powerupsEl.hidden = true;
+  }
+
+  async function doPeek() {
+    if (state.peek <= 0 || state.locked || !state.playing) return;
+    state.peek--;
+    state.usedPeek = true; // a peeked board doesn't grow the combo
+    renderPowerups();
+    sfx.power();
+    hidePowerups();
+    const wasLocked = state.locked;
+    state.locked = true;
+    if (MODES[state.mode].timed) pauseTimer();
+    // Re-flash the tiles not yet found.
+    const reveal = [...state.target].filter((i) => !state.found.has(i));
+    for (const i of reveal) tileAt(i).classList.add("lit");
+    promptEl.textContent = "Peek";
+    await wait(680);
+    if (!state.playing) return;
+    for (const i of reveal) tileAt(i).classList.remove("lit");
+    if (MODES[state.mode].timed) resumeTimer();
+    promptEl.textContent = `Tap ${state.target.size - state.found.size} more`;
+    state.locked = wasLocked;
+    renderPowerups();
+  }
+
+  function doSkip() {
+    if (state.skip <= 0 || state.locked || !state.playing) return;
+    state.skip--;
+    state.usedSkip = true; // a skipped board doesn't grow the combo
+    sfx.power();
+    hidePowerups();
+    // Auto-complete the board.
+    for (const i of state.target) {
+      if (!state.found.has(i)) {
+        state.found.add(i);
+        const t = tileAt(i);
+        if (t) t.classList.add("correct");
+      }
+    }
+    roundWon();
+  }
+
+  peekBtn.addEventListener("click", doPeek);
+  skipBtn.addEventListener("click", doSkip);
+
+  /* ============================================================
+     Level-up checkpoint
+     ============================================================ */
+  function showCheckpoint(level) {
+    $("checkpoint-num").textContent = level;
+    checkpointEl.classList.remove("closing");
+    checkpointEl.hidden = false;
+    // Restart the fade animation.
+    checkpointEl.style.animation = "none";
+    void checkpointEl.offsetWidth;
+    checkpointEl.style.animation = "";
+    sfx.checkpoint();
+    clearTimeout(checkpointEl._t);
+    checkpointEl._t = setTimeout(() => {
+      checkpointEl.hidden = true;
+    }, 1300);
   }
 
   /* ============================================================
@@ -499,15 +768,25 @@
     state.roundMisses = 0;
     state.maxLives = DIFFS[state.diff].lives;
     state.lives = state.maxLives;
+    state.peek = 0;
+    state.skip = 0;
+    state.usedSkip = false;
+    state.usedPeek = false;
     state.playing = true;
 
     state.rng = MODES[state.mode].seeded
       ? mulberry32(dailySeed())
       : Math.random;
 
+    // Record today's play and advance the streak.
+    registerPlay();
+    checkAchievements();
+
     hudEl.hidden = false;
     comboEl.hidden = true;
     backBtn.hidden = false;
+    hidePowerups();
+    checkpointEl.hidden = true;
     renderHUD();
     renderLives();
     closeAllScreens();
@@ -521,6 +800,7 @@
     state.playing = false;
     state.locked = true;
     stopTimer();
+    hidePowerups();
     boardEl.classList.remove("interactive");
     sfx.over();
 
@@ -543,6 +823,11 @@
     stats.best[state.mode] = Math.max(stats.best[state.mode] || 0, state.score);
     stats.recent.push(state.score);
     if (stats.recent.length > 16) stats.recent = stats.recent.slice(-16);
+
+    // A clean Sprint = at least one tap and zero wrong taps.
+    const cleanSprint =
+      state.mode === "sprint" && state.taps > 0 && state.hits === state.taps;
+    checkAchievements({ cleanSprint, bestSingle: state.score });
     saveStats();
 
     state.lastResult = {
@@ -618,7 +903,64 @@
     $("best-endless").textContent = stats.best.endless || 0;
     $("best-sprint").textContent = stats.best.sprint || 0;
     $("best-daily").textContent = stats.best.daily || 0;
+    // A streak counts as current only if you played today or yesterday.
+    const last = stats.streak.last;
+    const live =
+      last && daysBetween(last, todayKey()) <= 1 ? stats.streak.current : 0;
+    $("streak-current").textContent = live;
+    $("streak-longest").textContent = stats.streak.longest;
+    renderCalendar();
+    renderAchievements();
     renderSpark();
+  }
+
+  function renderCalendar() {
+    const cal = $("calendar");
+    cal.innerHTML = "";
+    const played = new Set(stats.playDays);
+    const today = new Date();
+    const todayStr = todayKey();
+    // Show whole weeks ending this week (Sun–Sat columns).
+    const WEEKS = 14;
+    const end = new Date(today);
+    end.setDate(end.getDate() + (6 - end.getDay())); // Saturday of this week
+    const totalDays = WEEKS * 7;
+    const start = new Date(end);
+    start.setDate(start.getDate() - (totalDays - 1));
+    for (let i = 0; i < totalDays; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      const cell = document.createElement("span");
+      const key = dateKey(d);
+      if (d > today) {
+        cell.className = "cal-cell blank";
+      } else {
+        cell.className = "cal-cell";
+        if (played.has(key)) cell.classList.add("played");
+        if (key === todayStr) cell.classList.add("today");
+        cell.title = key;
+      }
+      cal.appendChild(cell);
+    }
+    $("cal-legend").innerHTML =
+      '<span class="cal-cell" style="width:11px;height:11px"></span>—<span class="cal-cell played" style="width:11px;height:11px"></span>';
+  }
+
+  function renderAchievements() {
+    const grid = $("ach-grid");
+    grid.innerHTML = "";
+    const unlocked = new Set(stats.achievements);
+    for (const a of ACHIEVEMENTS) {
+      const has = unlocked.has(a.id);
+      const el = document.createElement("div");
+      el.className = "ach" + (has ? "" : " locked");
+      el.innerHTML =
+        `<span class="ach-badge">${ICONS[a.icon]}</span>` +
+        `<span class="ach-name">${has ? a.name : "Locked"}</span>`;
+      el.title = a.name;
+      grid.appendChild(el);
+    }
+    $("ach-count").textContent = `${unlocked.size} / ${ACHIEVEMENTS.length}`;
   }
   function renderSpark() {
     const svg = $("spark");
@@ -854,7 +1196,7 @@
   );
 
   $("reset-stats").addEventListener("click", () => {
-    if (confirm("Reset all stats and best scores?")) {
+    if (confirm("Reset all stats, streaks, and achievements?")) {
       stats.gamesPlayed = 0;
       stats.totalTaps = 0;
       stats.correctTaps = 0;
@@ -862,9 +1204,63 @@
       stats.bestCombo = 0;
       stats.best = { endless: 0, sprint: 0, daily: 0 };
       stats.recent = [];
+      stats.streak = { current: 0, longest: 0, last: null };
+      stats.playDays = [];
+      stats.achievements = [];
       saveStats();
       renderStatsScreen();
     }
+  });
+
+  /* ============================================================
+     Export / import progress
+     ============================================================ */
+  $("export-btn").addEventListener("click", () => {
+    const payload = {
+      app: "recall",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      prefs,
+      stats,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `recall-backup-${todayKey()}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+
+  $("import-btn").addEventListener("click", () => $("import-file").click());
+  $("import-file").addEventListener("change", (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        if (data.app !== "recall" || !data.stats)
+          throw new Error("Not a Recall backup");
+        if (
+          !confirm(
+            "Restore this backup? It will replace your current stats and settings."
+          )
+        )
+          return;
+        localStorage.setItem(STATS_KEY, JSON.stringify(data.stats));
+        if (data.prefs)
+          localStorage.setItem(PREFS_KEY, JSON.stringify(data.prefs));
+        location.reload();
+      } catch (err) {
+        alert("That file isn’t a valid Recall backup.");
+      } finally {
+        e.target.value = "";
+      }
+    };
+    reader.readAsText(file);
   });
 
   // Keyboard: space/enter starts from home or end screen.

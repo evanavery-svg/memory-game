@@ -52,7 +52,31 @@
       <div class="lives" id="lives" aria-label="Lives"></div>
     </section>
 
+    <!-- Combo-earned power-ups (shown only when available) -->
+    <div class="powerups" id="powerups" hidden>
+      <button class="power" id="power-peek" hidden>
+        <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="12" r="2.6" fill="currentColor"/></svg>
+        Peek <span class="power-n" id="peek-n">0</span>
+      </button>
+      <button class="power" id="power-skip" hidden>
+        <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M5 5l8 7-8 7zM16 5h2v14h-2z" fill="currentColor"/></svg>
+        Skip <span class="power-n" id="skip-n">0</span>
+      </button>
+    </div>
+
     <p class="prompt" id="prompt">Memorize the tiles.</p>
+
+    <!-- Level-up checkpoint beat -->
+    <div class="checkpoint" id="checkpoint" hidden aria-hidden="true">
+      <span class="checkpoint-num" id="checkpoint-num">5</span>
+      <span class="checkpoint-label">Level</span>
+    </div>
+
+    <!-- Toast for achievement unlocks -->
+    <div class="toast" id="toast" hidden role="status" aria-live="polite">
+      <span class="toast-icon" id="toast-icon"></span>
+      <span class="toast-body"><b id="toast-title">Achievement</b><span id="toast-sub">Unlocked</span></span>
+    </div>
 
     <!-- ===== Home screen ===== -->
     <section class="screen" id="home-screen">
@@ -118,7 +142,15 @@
           </div>
         </div>
 
-        <button class="cta ghost" data-close>Done</button>
+        <label class="field-label" style="margin-top:6px">Progress</label>
+        <div class="backup-row">
+          <button class="cta ghost backup-btn" id="export-btn">Back up</button>
+          <button class="cta ghost backup-btn" id="import-btn">Restore</button>
+        </div>
+        <input type="file" id="import-file" accept="application/json,.json" hidden />
+        <p class="field-hint">Save your stats and bests to a file, or restore them on another device.</p>
+
+        <button class="cta ghost" data-close style="margin-top:20px">Done</button>
       </div>
     </section>
 
@@ -126,11 +158,36 @@
     <section class="screen" id="stats-screen" hidden>
       <div class="screen-inner">
         <h2 class="screen-title">Stats</h2>
+
+        <!-- Streak banner -->
+        <div class="streak-banner">
+          <div class="streak-now">
+            <span class="streak-num" id="streak-current">0</span>
+            <span class="streak-cap">day streak</span>
+          </div>
+          <div class="streak-best">
+            <span id="streak-longest">0</span>
+            <span class="streak-cap">longest</span>
+          </div>
+        </div>
+
+        <!-- Calendar of prior days -->
+        <div class="cal-wrap">
+          <div class="spark-head"><span>Last weeks</span><span class="cal-legend" id="cal-legend"></span></div>
+          <div class="calendar" id="calendar" aria-label="Days played"></div>
+        </div>
+
         <div class="stat-grid">
           <div class="stat-card"><span class="big" id="s-games">0</span><span class="cap">Games</span></div>
           <div class="stat-card"><span class="big" id="s-acc">—</span><span class="cap">Accuracy</span></div>
           <div class="stat-card"><span class="big" id="s-level">0</span><span class="cap">Best level</span></div>
           <div class="stat-card"><span class="big" id="s-streak">0</span><span class="cap">Best combo</span></div>
+        </div>
+
+        <!-- Achievements -->
+        <div class="ach-wrap">
+          <div class="spark-head"><span>Achievements</span><span id="ach-count">0 / 0</span></div>
+          <div class="ach-grid" id="ach-grid"></div>
         </div>
 
         <div class="spark-wrap">
@@ -158,6 +215,7 @@
           <li>When it fades, tap every tile you saw.</li>
           <li>Clear the board to advance — each one is a little harder.</li>
           <li>Clear a board with no misses to build a <b>combo</b> multiplier.</li>
+          <li>Combos earn <b>Peek</b> and <b>Skip</b> power-ups — use them when a board is tough.</li>
           <li>A wrong tap costs a life. Lose them all and the run ends.</li>
         </ol>
         <p class="help-modes">

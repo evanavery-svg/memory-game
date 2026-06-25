@@ -359,13 +359,15 @@ body {
   background: var(--scrim);
   backdrop-filter: saturate(180%) blur(22px);
   -webkit-backdrop-filter: saturate(180%) blur(22px);
+  /* Column + margin:auto on the child centers when there's room but keeps the
+     top reachable when content overflows (flex align-items:center would clip it). */
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
   padding: max(24px, env(safe-area-inset-top)) 24px
     max(24px, env(safe-area-inset-bottom));
   z-index: 20;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   transition: opacity 0.38s var(--ease);
 }
 .screen[hidden] {
@@ -379,6 +381,7 @@ body {
 .screen-inner {
   width: 100%;
   max-width: 360px;
+  margin: auto;
   animation: screenIn 0.45s var(--ease);
 }
 @keyframes screenIn {
@@ -645,6 +648,10 @@ body {
   margin-bottom: 22px;
 }
 .spark-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.05em;
@@ -764,6 +771,326 @@ body {
 }
 .end-actions .cta {
   margin-bottom: 8px;
+}
+
+/* ============================================================
+   Power-ups
+   ============================================================ */
+.powerups {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin: 14px 0 -4px;
+  flex-shrink: 0;
+  min-height: 38px;
+}
+.powerups[hidden] {
+  display: none;
+}
+.power {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--tile);
+  border: 1px solid var(--tile-edge);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 9px 15px;
+  border-radius: 100px;
+  cursor: pointer;
+  letter-spacing: -0.01em;
+  transition: transform 0.2s var(--spring), opacity 0.2s var(--ease),
+    background 0.2s var(--ease);
+  animation: powerIn 0.3s var(--spring);
+}
+.power[hidden] {
+  display: none;
+}
+.power:active {
+  transform: scale(0.93);
+}
+.power:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+.power .power-n {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 100px;
+  background: var(--ink);
+  color: var(--bg);
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-grid;
+  place-items: center;
+  font-variant-numeric: tabular-nums;
+}
+@keyframes powerIn {
+  from { opacity: 0; transform: scale(0.7) translateY(6px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ============================================================
+   Level-up checkpoint
+   ============================================================ */
+.checkpoint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  z-index: 15;
+  pointer-events: none;
+  background: var(--scrim);
+  backdrop-filter: saturate(180%) blur(8px);
+  -webkit-backdrop-filter: saturate(180%) blur(8px);
+  animation: cpFade 1.3s var(--ease) forwards;
+}
+.checkpoint[hidden] {
+  display: none;
+}
+.checkpoint-num {
+  font-size: 110px;
+  font-weight: 700;
+  letter-spacing: -0.05em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  animation: cpPop 0.5s var(--spring);
+}
+.checkpoint-label {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+@keyframes cpPop {
+  0% { transform: scale(0.5); opacity: 0; }
+  60% { transform: scale(1.08); }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes cpFade {
+  0%, 70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ============================================================
+   Toast (achievement unlocked)
+   ============================================================ */
+.toast {
+  position: absolute;
+  top: max(14px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--ink);
+  color: var(--bg);
+  padding: 12px 18px 12px 14px;
+  border-radius: 100px;
+  box-shadow: 0 10px 30px var(--shadow);
+  z-index: 40;
+  max-width: calc(100% - 32px);
+  animation: toastIn 0.45s var(--spring);
+}
+.toast.out {
+  animation: toastOut 0.4s var(--ease) forwards;
+}
+.toast[hidden] {
+  display: none;
+}
+.toast-icon {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--bg);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+}
+.toast-icon svg {
+  width: 20px;
+  height: 20px;
+}
+.toast-body {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  min-width: 0;
+}
+.toast-body b {
+  font-size: 15px;
+  font-weight: 600;
+}
+.toast-body span {
+  font-size: 12.5px;
+  opacity: 0.7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@keyframes toastIn {
+  from { opacity: 0; transform: translate(-50%, -18px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+@keyframes toastOut {
+  to { opacity: 0; transform: translate(-50%, -18px); }
+}
+
+/* ============================================================
+   Streak banner + calendar
+   ============================================================ */
+.streak-banner {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.streak-now,
+.streak-best {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border-radius: 16px;
+  padding: 16px 12px;
+}
+.streak-now {
+  flex: 1.4;
+  background: var(--ink);
+  color: var(--bg);
+}
+.streak-best {
+  flex: 1;
+  background: var(--tile);
+  border: 1px solid var(--tile-edge);
+}
+.streak-num {
+  font-size: 38px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.streak-best span:first-child {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.streak-cap {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.cal-wrap {
+  margin-bottom: 24px;
+}
+.cal-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.calendar {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(7, 1fr);
+  gap: 4px;
+  width: 100%;
+}
+.cal-cell {
+  aspect-ratio: 1 / 1;
+  border-radius: 3px;
+  background: var(--tile);
+  border: 1px solid var(--tile-edge);
+}
+.cal-cell.played {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+.cal-cell.today {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--ink);
+}
+.cal-cell.blank {
+  background: none;
+  border: none;
+}
+
+/* ============================================================
+   Achievements
+   ============================================================ */
+.ach-wrap {
+  margin-bottom: 24px;
+}
+.ach-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.ach {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  text-align: center;
+  padding: 14px 6px;
+  border-radius: 14px;
+  background: var(--tile);
+  border: 1px solid var(--tile-edge);
+}
+.ach.locked {
+  opacity: 0.55;
+}
+.ach-badge {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--ink);
+  color: var(--bg);
+}
+.ach.locked .ach-badge {
+  background: none;
+  color: var(--muted);
+  border: 1.5px dashed var(--tile-edge);
+}
+.ach-badge svg {
+  width: 22px;
+  height: 22px;
+}
+.ach-name {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+/* ---------- Backup row ---------- */
+.backup-row {
+  display: flex;
+  gap: 10px;
+}
+.backup-btn {
+  margin-top: 0;
+  flex: 1;
+  font-size: 15px;
+  padding: 13px;
 }
 
 @media (prefers-reduced-motion: reduce) {
