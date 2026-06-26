@@ -302,7 +302,6 @@ body {
 .board.milestone .tile.lit {
   background: var(--c, var(--ink));
   border-color: var(--c, var(--ink));
-  box-shadow: 0 10px 26px var(--c);
 }
 .board.milestone .tile.correct {
   background: var(--c, var(--ink));
