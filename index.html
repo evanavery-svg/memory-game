@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/icon-180.png" />
   <link rel="icon" href="icons/icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=1.7" />
+  <link rel="stylesheet" href="style.css?v=1.8" />
   <title>Recall</title>
 </head>
 <body>
@@ -22,10 +22,7 @@
         <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
       <h1 class="wordmark">Recall</h1>
-      <button class="icon-btn" id="theme-btn" aria-label="Toggle theme">
-        <svg class="ico-sun" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="2"/><g stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M5.2 5.2l1.7 1.7M17.1 17.1l1.7 1.7M18.8 5.2l-1.7 1.7M6.9 17.1l-1.7 1.7"/></g></svg>
-        <svg class="ico-moon" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
-      </button>
+      <span class="icon-btn" aria-hidden="true"></span>
     </header>
 
     <!-- ===== In-game HUD ===== -->
@@ -148,15 +145,6 @@
         <div class="row-toggle">
           <span class="row-label">High contrast</span>
           <button class="switch" id="contrast-toggle" role="switch" aria-checked="false" aria-label="High contrast"><span class="knob"></span></button>
-        </div>
-        <div class="row-toggle">
-          <span class="row-label">Theme</span>
-          <div class="segmented small" id="theme-seg" data-store="theme" style="--count:3;--idx:0;">
-            <span class="thumb"></span>
-            <button class="seg is-active" data-value="system">Auto</button>
-            <button class="seg" data-value="light">Light</button>
-            <button class="seg" data-value="dark">Dark</button>
-          </div>
         </div>
 
         <label class="field-label" style="margin-top:6px">Progress</label>
@@ -306,6 +294,6 @@
     <canvas id="share-canvas" width="1080" height="1350" hidden></canvas>
   </main>
 
-  <script src="game.js?v=1.7"></script>
+  <script src="game.js?v=1.8"></script>
 </body>
 </html>

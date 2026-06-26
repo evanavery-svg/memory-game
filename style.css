@@ -126,25 +126,6 @@ body {
   display: none;
 }
 
-/* theme icon: show sun in light, moon in dark */
-.ico-moon {
-  display: none;
-}
-:root[data-theme="dark"] .ico-sun {
-  display: none;
-}
-:root[data-theme="dark"] .ico-moon {
-  display: block;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .ico-sun {
-    display: none;
-  }
-  :root:not([data-theme="light"]) .ico-moon {
-    display: block;
-  }
-}
-
 /* ---------- HUD ---------- */
 .hud {
   display: grid;

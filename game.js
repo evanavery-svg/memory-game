@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.7";
+  const VERSION = "1.8";
 
   /* ============================================================
      Elements
@@ -18,7 +18,6 @@
   const comboEl = $("combo");
   const comboX = $("combo-x");
   const backBtn = $("back-btn");
-  const themeBtn = $("theme-btn");
   const themeColorMeta = $("theme-color");
   const powerupsEl = $("powerups");
   const peekBtn = $("power-peek");
@@ -363,34 +362,19 @@
   /* ============================================================
      Theme
      ============================================================ */
+  // The app always follows the phone's light/dark setting — no manual override.
+  const systemDark = () =>
+    window.matchMedia("(prefers-color-scheme: dark)").matches;
   function applyTheme() {
-    const t = prefs.theme;
-    if (t === "system") document.documentElement.removeAttribute("data-theme");
-    else document.documentElement.setAttribute("data-theme", t);
-    // Sync the status-bar / browser theme color.
-    const dark =
-      t === "dark" ||
-      (t === "system" &&
-        window.matchMedia("(prefers-color-scheme: dark)").matches);
-    themeColorMeta.setAttribute("content", dark ? "#000000" : "#ffffff");
+    // No data-theme attribute means the CSS prefers-color-scheme rules drive
+    // the palette. Just keep the status-bar / browser theme color in sync.
+    document.documentElement.removeAttribute("data-theme");
+    themeColorMeta.setAttribute("content", systemDark() ? "#000000" : "#ffffff");
   }
-  themeBtn.addEventListener("click", () => {
-    // Quick toggle between light & dark (leaves "system" via settings).
-    const dark =
-      prefs.theme === "dark" ||
-      (prefs.theme === "system" &&
-        window.matchMedia("(prefers-color-scheme: dark)").matches);
-    prefs.theme = dark ? "light" : "dark";
-    savePrefs();
-    applyTheme();
-    syncSegmented("theme-seg", prefs.theme);
-    ac(); // unlock audio on first interaction
-  });
+  // Flip live when the phone switches between light and dark.
   window
     .matchMedia("(prefers-color-scheme: dark)")
-    .addEventListener("change", () => {
-      if (prefs.theme === "system") applyTheme();
-    });
+    .addEventListener("change", applyTheme);
 
   /* ============================================================
      Difficulty curve
@@ -932,6 +916,9 @@
       ? mulberry32(dailySeed())
       : Math.random;
 
+    // Daily locks the moment it starts — one attempt per day, no resuming.
+    if (state.mode === "daily") stats.dailyDone = todayKey();
+
     // Record today's play and advance the streak.
     registerPlay();
     checkAchievements();
@@ -982,9 +969,6 @@
     const cleanSprint =
       state.mode === "sprint" && state.taps > 0 && state.hits === state.taps;
     checkAchievements({ cleanSprint, bestSingle: state.score });
-
-    // Lock the Daily for the rest of the day so each day yields one score.
-    if (state.mode === "daily") stats.dailyDone = todayKey();
     saveStats();
 
     state.lastResult = {
@@ -1234,10 +1218,7 @@
     const W = canvas.width,
       H = canvas.height;
 
-    const dark =
-      prefs.theme === "dark" ||
-      (prefs.theme !== "light" &&
-        window.matchMedia("(prefers-color-scheme: dark)").matches);
+    const dark = systemDark();
     const bg = dark ? "#000000" : "#ffffff";
     const ink = dark ? "#ffffff" : "#000000";
     const sub = "#8d8d93";
@@ -1407,11 +1388,6 @@
     savePrefs();
     $("diff-hint").textContent = DIFFS[v].hint;
   });
-  initSegmented("theme-seg", (v) => {
-    prefs.theme = v;
-    savePrefs();
-    applyTheme();
-  });
   initSwitch("sound-toggle", "sound");
   initSwitch("haptics-toggle", "haptics");
   initSwitch("adaptive-toggle", "adaptive");
@@ -1572,7 +1548,6 @@
     applyTheme();
     syncSegmented("mode-seg", prefs.mode);
     syncSegmented("diff-seg", prefs.difficulty);
-    syncSegmented("theme-seg", prefs.theme);
     syncHomeHints();
     bestEl.textContent = stats.best[prefs.mode] || 0;
 
