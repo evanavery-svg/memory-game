@@ -296,6 +296,40 @@ body {
   75% { transform: translateX(5px); }
 }
 
+/* ---------- Milestone levels (colored celebratory beat) ---------- */
+/* On milestone levels each lit/cleared tile glows in its assigned color (--c),
+   and a correct tap pops with an expanding ring. Plain B&W everywhere else. */
+.board.milestone .tile.lit {
+  background: var(--c, var(--ink));
+  border-color: var(--c, var(--ink));
+  box-shadow: 0 10px 26px var(--c);
+}
+.board.milestone .tile.correct {
+  background: var(--c, var(--ink));
+  border-color: var(--c, var(--ink));
+}
+.tile.pop {
+  animation: colorPop 0.5s var(--spring);
+}
+.tile.pop::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 15px;
+  border: 2px solid var(--c);
+  pointer-events: none;
+  animation: ringBurst 0.55s var(--ease) forwards;
+}
+@keyframes colorPop {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+@keyframes ringBurst {
+  from { opacity: 0.9; transform: scale(1); }
+  to { opacity: 0; transform: scale(1.7); }
+}
+
 
 /* ---------- Lives / timer ---------- */
 .lives {

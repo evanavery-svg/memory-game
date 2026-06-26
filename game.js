@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.3.1";
+  const VERSION = "1.4";
 
   /* ============================================================
      Elements
@@ -390,6 +390,16 @@
   /* ============================================================
      Difficulty curve
      ============================================================ */
+  // Milestone levels (the opener and every fifth) break the black-and-white
+  // palette: tiles flash in color and a correct tap pops with a ring burst.
+  function isMilestone(level) {
+    return level === 1 || level % 5 === 0;
+  }
+  const MILESTONE_COLORS = [
+    "#ff3b30", "#ff9500", "#ffcc00", "#34c759", "#00c7be",
+    "#0a84ff", "#5e5ce6", "#bf5af2", "#ff2d55",
+  ]; // Apple system colors — legible on both light and dark backgrounds.
+
   function boardSpec(level) {
     const d = DIFFS[state.diff];
     const grow = (level - 1) * d.scale;
@@ -400,7 +410,9 @@
       3,
       Math.floor(cells * 0.45)
     );
-    let flashMs = clamp(1500 - (level - 1) * 70 + d.flashBonus, 600, 2600);
+    // Flash time scales with how many tiles you must memorize — harder boards
+    // (more lit tiles) get a longer look, rather than a shrinking one.
+    let flashMs = clamp(900 + lit * 130 + d.flashBonus, 600, 3200);
     // Adaptive difficulty: nudge flash time by a learned offset so the game
     // self-calibrates to your skill. Never in Daily — it must stay identical
     // for everyone.
@@ -516,6 +528,21 @@
     state.order = sampleList(gridSize * gridSize, lit);
     state.target = new Set(state.order);
 
+    // Milestone levels get a colored treatment. buildBoard() rebuilds the grid
+    // each round, so per-tile colors clear on their own — only the board-level
+    // class needs toggling.
+    state.milestone = isMilestone(state.level);
+    boardEl.classList.toggle("milestone", state.milestone);
+    if (state.milestone) {
+      let ci = 0;
+      for (const idx of state.target) {
+        tileAt(idx).style.setProperty(
+          "--c",
+          MILESTONE_COLORS[ci++ % MILESTONE_COLORS.length]
+        );
+      }
+    }
+
     renderHUD();
     promptEl.textContent = "Memorize";
 
@@ -572,6 +599,7 @@
         state.found.add(index);
         state.seqStep++;
         tile.classList.add("correct");
+        if (state.milestone) tile.classList.add("pop");
         sfx.correct(state.seqStep);
         if (state.seqStep === state.order.length) roundWon();
       } else {
@@ -586,6 +614,7 @@
       state.hits++;
       state.found.add(index);
       tile.classList.add("correct");
+      if (state.milestone) tile.classList.add("pop");
       sfx.correct(state.found.size);
       if (state.found.size === state.target.size) roundWon();
     } else {

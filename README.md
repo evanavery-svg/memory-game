@@ -30,12 +30,16 @@ No build step, no dependencies.
   (auto-clear a board). They surface beside the board only when you have them.
 - **Level-up checkpoints** — every five levels, a brief full-screen beat marks
   the milestone.
+- **Colored milestone levels** — the opening level and every fifth one break the
+  black-and-white palette: tiles flash in color and a correct tap pops with an
+  expanding ring. Everything else stays strictly monochrome.
 - **Daily streaks** — playing on consecutive days builds a streak, with a
   contribution-style calendar of prior days and your longest run.
 - **Achievements** — nine unlockable badges (combos, levels, streaks, a clean
   Sprint…) with a toast when you earn one.
-- **Gradual difficulty** — the grid grows from 3×3 toward 6×6, lit tiles climb
-  slowly, and the flash time eases down. Three presets:
+- **Gradual difficulty** — the grid grows from 3×3 toward 6×6 and lit tiles climb
+  slowly. Flash time scales with how many tiles you must memorize, so harder
+  boards get a longer look. Three presets:
   - **Casual** — longer flash, five lives.
   - **Standard** — balanced, three lives.
   - **Hard** — quick flash, two lives, a faster ramp.
