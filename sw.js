@@ -1,10 +1,10 @@
 /* Recall service worker — offline-first caching */
-const CACHE = "recall-v19";
+const CACHE = "recall-v20";
 const ASSETS = [
   "./",
   "./index.html",
-  "./style.css?v=1.6",
-  "./game.js?v=1.6",
+  "./style.css?v=1.7",
+  "./game.js?v=1.7",
   "./manifest.webmanifest",
   "./icons/icon-192.png",
   "./icons/icon-512.png",

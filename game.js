@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.6";
+  const VERSION = "1.7";
 
   /* ============================================================
      Elements
@@ -395,11 +395,9 @@
   /* ============================================================
      Difficulty curve
      ============================================================ */
-  // Milestone levels (the opener and every fifth) break the black-and-white
-  // palette: tiles flash in color and a correct tap pops with a ring burst.
-  function isMilestone(level) {
-    return level === 1 || level % 5 === 0;
-  }
+  // A rare board (5% of levels) breaks the black-and-white palette: tiles flash
+  // in color and a correct tap pops with a ring burst. Rolled fresh each level.
+  const MILESTONE_CHANCE = 0.05;
   const MILESTONE_COLORS = [
     "#ff3b30", "#ff9500", "#ffcc00", "#34c759", "#00c7be",
     "#0a84ff", "#5e5ce6", "#bf5af2", "#ff2d55",
@@ -410,7 +408,7 @@
     const grow = (level - 1) * d.scale;
     const gridSize = Math.min(3 + Math.floor(grow / 3), 6);
     const cells = gridSize * gridSize;
-    const lit = clamp(
+    let lit = clamp(
       2 + Math.ceil(level * d.scale * 0.9),
       3,
       Math.floor(cells * 0.45)
@@ -423,6 +421,13 @@
     // for everyone.
     if (prefs.adaptive && state.mode !== "daily") {
       flashMs = clamp(flashMs + stats.calib, 500, 2800);
+    }
+    // Daily ramps up sharply from level 15 on: more tiles to hold and a much
+    // shorter look, so the one-run-a-day challenge bites for strong players.
+    if (state.mode === "daily" && level >= 15) {
+      const over = level - 14;
+      lit = Math.min(lit + Math.floor(over / 2), Math.floor(cells * 0.6));
+      flashMs = clamp(flashMs - over * 100, 380, 3200);
     }
     return { gridSize, lit, flashMs };
   }
@@ -533,10 +538,11 @@
     state.order = sampleList(gridSize * gridSize, lit);
     state.target = new Set(state.order);
 
-    // Milestone levels get a colored treatment. buildBoard() rebuilds the grid
-    // each round, so per-tile colors clear on their own — only the board-level
-    // class needs toggling.
-    state.milestone = isMilestone(state.level);
+    // A small chance each level turns the board colorful. buildBoard() rebuilds
+    // the grid each round, so per-tile colors clear on their own — only the
+    // board-level class needs toggling. The roll uses Math.random (not the daily
+    // seed) so it never perturbs which tiles are chosen.
+    state.milestone = Math.random() < MILESTONE_CHANCE;
     boardEl.classList.toggle("milestone", state.milestone);
     if (state.milestone) {
       let ci = 0;
@@ -1646,15 +1652,33 @@
       by.textContent = q.by;
     };
     paint();
+    let rotating = false;
     setInterval(() => {
-      // Only rotate while the home screen is actually visible.
-      if (screens.home.hidden) return;
-      fig.classList.add("fade");
-      setTimeout(() => {
+      // Only rotate while the home screen is visible and not mid-rotation.
+      if (screens.home.hidden || rotating) return;
+      rotating = true;
+
+      // Swap the text only once the fade-out has truly finished, so the old and
+      // new quotes never paint at the same time (which looked like overlap on
+      // slower devices). transitionend is authoritative; the timeout is a
+      // fallback for when the element is hidden or motion is reduced.
+      let swapped = false;
+      const swap = () => {
+        if (swapped) return;
+        swapped = true;
         i++;
         paint();
-        fig.classList.remove("fade");
-      }, 600);
+        // Let the new text commit at opacity 0 before fading it back in.
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            fig.classList.remove("fade");
+            rotating = false;
+          })
+        );
+      };
+      fig.addEventListener("transitionend", swap, { once: true });
+      setTimeout(swap, 750);
+      fig.classList.add("fade");
     }, 7000);
   }
 

@@ -20,7 +20,8 @@ No build step, no dependencies.
   - **Sprint** — most points in 60 seconds; a miss costs time instead of a life.
   - **Daily** — a deterministic seed gives everyone the same boards each day,
     with a spoiler-free, Wordle-style result you can copy and share. One run per
-    day — it locks once you finish and resets at midnight local time.
+    day — it locks once you finish and resets at midnight local time. The ramp
+    turns brutal from level 15 on.
   - **Order** — tiles flash one at a time; tap them back in the same sequence.
 - **Adaptive difficulty** — flash time self-calibrates to your skill as you play
   (off in Daily, and can be disabled in Settings).
@@ -31,9 +32,9 @@ No build step, no dependencies.
   (auto-clear a board). They surface beside the board only when you have them.
 - **Level-up checkpoints** — every five levels, a brief full-screen beat marks
   the milestone.
-- **Colored milestone levels** — the opening level and every fifth one break the
-  black-and-white palette: tiles flash in color and a correct tap pops with an
-  expanding ring. Everything else stays strictly monochrome.
+- **Rare color levels** — about one board in twenty breaks the black-and-white
+  palette: tiles flash in color and a correct tap pops with a small ring.
+  Everything else stays strictly monochrome.
 - **Daily streaks** — playing on consecutive days builds a streak, with a
   contribution-style calendar of prior days and your longest run.
 - **Achievements** — nine unlockable badges (combos, levels, streaks, a clean
