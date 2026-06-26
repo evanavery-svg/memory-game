@@ -191,9 +191,11 @@ body {
   height: 18px;
   margin-top: 2px;
   flex-shrink: 0;
+  /* Always occupy space — only the text fades, so the board never shifts. */
+  visibility: hidden;
 }
-.combo[hidden] {
-  display: none;
+.combo.show {
+  visibility: visible;
 }
 .combo #combo-x {
   color: var(--ink);
@@ -811,15 +813,21 @@ body {
    Power-ups
    ============================================================ */
 .powerups {
-  display: flex;
+  display: none; /* collapsed until you actually hold a power-up */
   gap: 10px;
   justify-content: center;
   margin: 14px 0 -4px;
   flex-shrink: 0;
   min-height: 38px;
+  visibility: hidden;
 }
-.powerups[hidden] {
-  display: none;
+/* Once you hold a token, keep the row's space reserved so it doesn't pop in and
+   out between the flash and tap phases and shove the board around. */
+.powerups.reserved {
+  display: flex;
+}
+.powerups.show {
+  visibility: visible;
 }
 .power {
   appearance: none;

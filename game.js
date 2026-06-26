@@ -416,14 +416,14 @@
   }
   function renderCombo() {
     if (state.combo >= 2) {
-      comboEl.hidden = false;
+      comboEl.classList.add("show");
       comboX.textContent = "×" + state.combo;
       comboX.animate(
         [{ transform: "scale(1)" }, { transform: "scale(1.5)" }, { transform: "scale(1)" }],
         { duration: 450, easing: "cubic-bezier(0.34, 1.56, 0.64, 1)" }
       );
     } else {
-      comboEl.hidden = true;
+      comboEl.classList.remove("show");
     }
   }
   function renderLives() {
@@ -660,11 +660,13 @@
     skipBtn.hidden = state.skip <= 0;
     peekN.textContent = state.peek;
     skipN.textContent = state.skip;
-    const show = !state.locked && state.playing && (state.peek > 0 || state.skip > 0);
-    powerupsEl.hidden = !show;
+    const hasTokens = state.peek > 0 || state.skip > 0;
+    powerupsEl.classList.toggle("reserved", hasTokens);
+    powerupsEl.classList.toggle("show", hasTokens && !state.locked && state.playing);
   }
   function hidePowerups() {
-    powerupsEl.hidden = true;
+    // Hide the buttons but keep the reserved space; fully cleared on a new game.
+    powerupsEl.classList.remove("show");
   }
 
   async function doPeek() {
@@ -806,9 +808,9 @@
     checkAchievements();
 
     hudEl.hidden = false;
-    comboEl.hidden = true;
+    comboEl.classList.remove("show");
     backBtn.hidden = false;
-    hidePowerups();
+    powerupsEl.classList.remove("show", "reserved");
     checkpointEl.hidden = true;
     renderHUD();
     renderLives();
@@ -891,7 +893,8 @@
     state.playing = false;
     stopTimer();
     hudEl.hidden = true;
-    comboEl.hidden = true;
+    comboEl.classList.remove("show");
+    powerupsEl.classList.remove("show", "reserved");
     backBtn.hidden = true;
     showScreen("home");
     syncHomeHints();
