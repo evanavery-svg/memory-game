@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.5.2";
+  const VERSION = "1.6";
 
   /* ============================================================
      Elements
@@ -69,6 +69,7 @@
       playDays: [], // ["YYYY-MM-DD", ...]
       achievements: [], // unlocked ids
       calib: 0, // adaptive flash-time offset in ms (negative = harder)
+      dailyDone: null, // local date key of the last completed Daily run
     },
     readJSON(STATS_KEY, {})
   );
@@ -178,6 +179,9 @@
     return `${y}-${m}-${day}`;
   }
   const todayKey = () => dateKey(new Date());
+  // Daily is one-and-done per local calendar day; it unlocks again at midnight
+  // because todayKey() rolls over to a new date.
+  const dailyDoneToday = () => stats.dailyDone === todayKey();
   function daysBetween(aKey, bKey) {
     const a = new Date(aKey + "T00:00:00");
     const b = new Date(bKey + "T00:00:00");
@@ -896,6 +900,11 @@
      ============================================================ */
   function newGame() {
     ac(); // unlock audio
+    // Daily is locked to one run per day — already played today? Bounce home.
+    if (prefs.mode === "daily" && dailyDoneToday()) {
+      goHome();
+      return;
+    }
     state.mode = prefs.mode;
     state.diff = prefs.difficulty;
     state.level = 1;
@@ -967,6 +976,9 @@
     const cleanSprint =
       state.mode === "sprint" && state.taps > 0 && state.hits === state.taps;
     checkAchievements({ cleanSprint, bestSingle: state.score });
+
+    // Lock the Daily for the rest of the day so each day yields one score.
+    if (state.mode === "daily") stats.dailyDone = todayKey();
     saveStats();
 
     state.lastResult = {
@@ -1068,6 +1080,8 @@
       detail + (r.combo >= 2 ? ` · best ×${r.combo}` : "");
     $("end-best").hidden = !r.isBest;
     $("copy-result").hidden = r.mode !== "daily";
+    // Daily can't be replayed today, so the primary action returns home.
+    $("again-btn").textContent = r.mode === "daily" ? "Back to home" : "Play again";
     showScreen("end");
   }
 
@@ -1364,8 +1378,14 @@
   }
 
   function syncHomeHints() {
-    $("mode-hint").textContent = MODES[prefs.mode].hint;
+    const dailyLocked = prefs.mode === "daily" && dailyDoneToday();
+    $("mode-hint").textContent = dailyLocked
+      ? "Today’s Daily is done. New boards at midnight."
+      : MODES[prefs.mode].hint;
     $("diff-hint").textContent = DIFFS[prefs.difficulty].hint;
+    const play = $("play-btn");
+    play.disabled = dailyLocked;
+    play.textContent = dailyLocked ? "Come back tomorrow" : "Play";
   }
 
   /* ============================================================
@@ -1374,7 +1394,7 @@
   initSegmented("mode-seg", (v) => {
     prefs.mode = v;
     savePrefs();
-    $("mode-hint").textContent = MODES[v].hint;
+    syncHomeHints();
   });
   initSegmented("diff-seg", (v) => {
     prefs.difficulty = v;
@@ -1461,6 +1481,7 @@
       stats.playDays = [];
       stats.achievements = [];
       stats.calib = 0;
+      stats.dailyDone = null;
       saveStats();
       renderStatsScreen();
     }
@@ -1534,6 +1555,8 @@
   // return. (Kept separate from flash/peek pausing so the two never collide.)
   document.addEventListener("visibilitychange", () => {
     tabHidden = document.hidden;
+    // Coming back after midnight should re-open the Daily on the home screen.
+    if (!document.hidden && !state.playing) syncHomeHints();
   });
 
   /* ============================================================

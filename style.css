@@ -608,6 +608,11 @@ body {
   transform: scale(0.97);
   opacity: 0.92;
 }
+.cta:disabled {
+  opacity: 0.4;
+  cursor: default;
+  transform: none;
+}
 .cta.ghost {
   background: none;
   color: var(--ink);

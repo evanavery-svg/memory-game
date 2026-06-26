@@ -19,7 +19,8 @@ No build step, no dependencies.
   - **Endless** — clear boards as far as you can.
   - **Sprint** — most points in 60 seconds; a miss costs time instead of a life.
   - **Daily** — a deterministic seed gives everyone the same boards each day,
-    with a spoiler-free, Wordle-style result you can copy and share.
+    with a spoiler-free, Wordle-style result you can copy and share. One run per
+    day — it locks once you finish and resets at midnight local time.
   - **Order** — tiles flash one at a time; tap them back in the same sequence.
 - **Adaptive difficulty** — flash time self-calibrates to your skill as you play
   (off in Daily, and can be disabled in Settings).
