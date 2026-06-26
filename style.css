@@ -1122,6 +1122,77 @@ body {
   line-height: 1.2;
 }
 
+/* ---------- 4-up mode selector ---------- */
+/* The mode segmented control holds four options — tighten the type so labels
+   ("Endless", "Sprint", "Daily", "Order") fit on narrow phones. */
+.segmented.mode-seg .seg {
+  font-size: 13.5px;
+  padding: 11px 2px;
+  letter-spacing: -0.02em;
+}
+
+/* ---------- Tutorial ---------- */
+.tut-coach {
+  text-align: center;
+  font-size: 16px;
+  color: var(--ink);
+  margin: 0 0 6px;
+  min-height: 44px;
+  font-weight: 500;
+}
+.tut-board {
+  margin: 4px auto 14px;
+  max-width: 230px;
+}
+.tut-board .tile {
+  cursor: pointer;
+}
+.tut-dots {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  margin-bottom: 22px;
+  min-height: 8px;
+}
+.tut-dots i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--tile-edge);
+  transition: background 0.3s var(--ease), transform 0.3s var(--spring);
+}
+.tut-dots i.on {
+  background: var(--ink);
+  transform: scale(1.25);
+}
+#tut-skip {
+  display: block;
+  margin: 10px auto 0;
+}
+
+/* ---------- High contrast ---------- */
+:root[data-contrast] {
+  --tile: var(--bg);
+  --tile-edge: var(--ink);
+  --tile-hover: var(--bg);
+  --hairline: var(--ink);
+}
+:root[data-contrast] .tile {
+  border-width: 2px;
+}
+:root[data-contrast] .life.lost {
+  border-color: var(--ink);
+}
+
+/* ---------- Keyboard focus ---------- */
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+.tile:focus-visible {
+  outline-offset: -3px;
+}
+
 /* ---------- Backup row ---------- */
 .backup-row {
   display: flex;

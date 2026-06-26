@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/icon-180.png" />
   <link rel="icon" href="icons/icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=1.2" />
+  <link rel="stylesheet" href="style.css?v=1.3" />
   <title>Recall</title>
 </head>
 <body>
@@ -64,7 +64,7 @@
       </button>
     </div>
 
-    <p class="prompt" id="prompt">Memorize the tiles.</p>
+    <p class="prompt" id="prompt" role="status" aria-live="polite">Memorize the tiles.</p>
 
     <!-- Level-up checkpoint beat -->
     <div class="checkpoint" id="checkpoint" hidden aria-hidden="true">
@@ -84,16 +84,17 @@
         <div class="hero">
           <div class="hero-mark" id="hero-mark" aria-hidden="true"></div>
           <h2 class="hero-title">Recall</h2>
-          <p class="hero-sub">Memory, beautifully simple.</p>
+          <p class="hero-sub" id="hero-sub">Memory, beautifully simple.</p>
         </div>
 
         <div class="field">
           <label class="field-label">Mode</label>
-          <div class="segmented" id="mode-seg" data-store="mode" style="--count:3;--idx:0;" role="tablist">
+          <div class="segmented mode-seg" id="mode-seg" data-store="mode" style="--count:4;--idx:0;" role="tablist">
             <span class="thumb"></span>
             <button class="seg is-active" data-value="endless" role="tab">Endless</button>
             <button class="seg" data-value="sprint" role="tab">Sprint</button>
             <button class="seg" data-value="daily" role="tab">Daily</button>
+            <button class="seg" data-value="sequence" role="tab">Order</button>
           </div>
           <p class="field-hint" id="mode-hint">Clear boards forever. Three lives.</p>
         </div>
@@ -138,6 +139,14 @@
         <div class="row-toggle">
           <span class="row-label">Haptics</span>
           <button class="switch is-on" id="haptics-toggle" role="switch" aria-checked="true" aria-label="Haptics"><span class="knob"></span></button>
+        </div>
+        <div class="row-toggle">
+          <span class="row-label">Adaptive difficulty</span>
+          <button class="switch is-on" id="adaptive-toggle" role="switch" aria-checked="true" aria-label="Adaptive difficulty"><span class="knob"></span></button>
+        </div>
+        <div class="row-toggle">
+          <span class="row-label">High contrast</span>
+          <button class="switch" id="contrast-toggle" role="switch" aria-checked="false" aria-label="High contrast"><span class="knob"></span></button>
         </div>
         <div class="row-toggle">
           <span class="row-label">Theme</span>
@@ -206,6 +215,7 @@
           <li><span>Endless best</span><b id="best-endless">0</b></li>
           <li><span>Sprint best</span><b id="best-sprint">0</b></li>
           <li><span>Daily best</span><b id="best-daily">0</b></li>
+          <li><span>Order best</span><b id="best-sequence">0</b></li>
         </ul>
 
         <button class="link-btn danger" id="reset-stats">Reset stats</button>
@@ -234,6 +244,19 @@
       </div>
     </section>
 
+    <!-- ===== First-run tutorial ===== -->
+    <section class="screen" id="tutorial-screen" hidden>
+      <div class="screen-inner">
+        <p class="end-kicker">Welcome to Recall</p>
+        <h2 class="screen-title" style="margin-bottom:14px">How to play</h2>
+        <p class="tut-coach" id="tut-coach" role="status" aria-live="polite">Watch which tiles light up.</p>
+        <div class="board tut-board" id="tut-board" role="grid" aria-label="Tutorial grid"></div>
+        <div class="tut-dots" id="tut-dots" aria-hidden="true"></div>
+        <button class="cta" id="tut-start" hidden>Start playing</button>
+        <button class="link-btn" id="tut-skip">Skip the tour</button>
+      </div>
+    </section>
+
     <!-- ===== End screen ===== -->
     <section class="screen" id="end-screen" hidden>
       <div class="screen-inner">
@@ -244,6 +267,7 @@
         <div class="end-actions">
           <button class="cta" id="again-btn">Play again</button>
           <button class="link-btn" id="share-btn">Share result</button>
+          <button class="link-btn" id="copy-result" hidden>Copy daily result</button>
           <button class="link-btn" id="end-home">Home</button>
         </div>
       </div>
@@ -253,6 +277,6 @@
     <canvas id="share-canvas" width="1080" height="1350" hidden></canvas>
   </main>
 
-  <script src="game.js?v=1.2"></script>
+  <script src="game.js?v=1.3"></script>
 </body>
 </html>

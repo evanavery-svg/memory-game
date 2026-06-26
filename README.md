@@ -15,10 +15,15 @@ No build step, no dependencies.
 
 ## Features
 
-- **Three modes**
+- **Four modes**
   - **Endless** — clear boards as far as you can.
   - **Sprint** — most points in 60 seconds; a miss costs time instead of a life.
-  - **Daily** — a deterministic seed gives everyone the same boards each day.
+  - **Daily** — a deterministic seed gives everyone the same boards each day,
+    with a spoiler-free, Wordle-style result you can copy and share.
+  - **Order** — tiles flash one at a time; tap them back in the same sequence.
+- **Adaptive difficulty** — flash time self-calibrates to your skill as you play
+  (off in Daily, and can be disabled in Settings).
+- **First-run tutorial** — a short guided round the first time you open the app.
 - **Combo multiplier** — clear a board with no misses to build ×2, ×3 … up to
   ×9. One miss resets it.
 - **Power-ups** — combos earn **Peek** (re-flash the pattern) and **Skip**
@@ -36,6 +41,8 @@ No build step, no dependencies.
   - **Hard** — quick flash, two lives, a faster ramp.
 - **Dark mode** — follows the system theme, or lock it Light/Dark. A one-tap
   toggle lives in the top bar.
+- **Accessibility** — a high-contrast option, keyboard focus outlines, live
+  status announcements for each round phase, and reduced-motion support.
 - **Sound & haptics** — generated WebAudio tones (no asset files) and vibration
   on supported devices. Both can be muted.
 - **Stats & history** — games played, tap accuracy, best level, best combo, a

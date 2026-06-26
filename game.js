@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.2";
+  const VERSION = "1.3";
 
   /* ============================================================
      Elements
@@ -49,6 +49,8 @@
       theme: "system",
       sound: true,
       haptics: true,
+      adaptive: true,
+      contrast: false,
     },
     readJSON(PREFS_KEY, {})
   );
@@ -60,19 +62,21 @@
       correctTaps: 0,
       bestLevel: 0,
       bestCombo: 0,
-      best: { endless: 0, sprint: 0, daily: 0 },
+      best: { endless: 0, sprint: 0, daily: 0, sequence: 0 },
       recent: [],
       streak: { current: 0, longest: 0, last: null },
       playDays: [], // ["YYYY-MM-DD", ...]
       achievements: [], // unlocked ids
+      calib: 0, // adaptive flash-time offset in ms (negative = harder)
     },
     readJSON(STATS_KEY, {})
   );
   // Backfill nested defaults for older saves.
   stats.streak = Object.assign({ current: 0, longest: 0, last: null }, stats.streak);
-  stats.best = Object.assign({ endless: 0, sprint: 0, daily: 0 }, stats.best);
+  stats.best = Object.assign({ endless: 0, sprint: 0, daily: 0, sequence: 0 }, stats.best);
   if (!Array.isArray(stats.playDays)) stats.playDays = [];
   if (!Array.isArray(stats.achievements)) stats.achievements = [];
+  if (typeof stats.calib !== "number") stats.calib = 0;
 
   function readJSON(key, fallback) {
     try {
@@ -101,6 +105,12 @@
       hint: "Most points in 60 seconds. Misses cost time.",
     },
     daily: { label: "Level", timed: false, seeded: true, hint: "The same boards for everyone, every day." },
+    sequence: {
+      label: "Level",
+      timed: false,
+      ordered: true,
+      hint: "Tiles flash in order — tap them back in the same order.",
+    },
   };
 
   const DIFFS = {
@@ -123,6 +133,8 @@
     combo: 1,
     bestCombo: 1,
     target: new Set(),
+    order: [], // ordered indices for Sequence mode
+    seqStep: 0, // next index to tap in the sequence
     found: new Set(),
     taps: 0,
     hits: 0,
@@ -388,8 +400,20 @@
       3,
       Math.floor(cells * 0.45)
     );
-    const flashMs = clamp(1500 - (level - 1) * 70 + d.flashBonus, 600, 2600);
+    let flashMs = clamp(1500 - (level - 1) * 70 + d.flashBonus, 600, 2600);
+    // Adaptive difficulty: nudge flash time by a learned offset so the game
+    // self-calibrates to your skill. Never in Daily — it must stay identical
+    // for everyone.
+    if (prefs.adaptive && state.mode !== "daily") {
+      flashMs = clamp(flashMs + stats.calib, 500, 2800);
+    }
     return { gridSize, lit, flashMs };
+  }
+  // Shift the adaptive offset: clean rounds make it a touch harder, misses ease
+  // it back. Bounded so it can't run away.
+  function adapt(delta) {
+    if (!prefs.adaptive) return;
+    stats.calib = clamp(stats.calib + delta, -500, 700);
   }
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -465,13 +489,14 @@
   }
   const tileAt = (i) => boardEl.children[i];
 
-  function sample(total, count) {
+  // Shuffle 0..total-1 and take `count` — returns an ordered list.
+  function sampleList(total, count) {
     const pool = Array.from({ length: total }, (_, i) => i);
     for (let i = pool.length - 1; i > 0; i--) {
       const j = Math.floor(state.rng() * (i + 1));
       [pool[i], pool[j]] = [pool[j], pool[i]];
     }
-    return new Set(pool.slice(0, count));
+    return pool.slice(0, count);
   }
 
   /* ============================================================
@@ -479,34 +504,53 @@
      ============================================================ */
   async function startRound() {
     const { gridSize, lit, flashMs } = boardSpec(state.level);
+    const ordered = MODES[state.mode].ordered;
     state.locked = true;
     state.found = new Set();
+    state.seqStep = 0;
     state.usedSkip = false;
     state.usedPeek = false;
     hidePowerups();
 
     buildBoard(gridSize);
-    state.target = sample(gridSize * gridSize, lit);
+    state.order = sampleList(gridSize * gridSize, lit);
+    state.target = new Set(state.order);
 
     renderHUD();
     promptEl.textContent = "Memorize";
 
     await wait(420);
     if (!state.playing) return;
-    sfx.flash();
-    for (const idx of state.target) tileAt(idx).classList.add("lit");
 
-    if (MODES[state.mode].timed) pauseTimer();
-    await wait(flashMs);
-    if (!state.playing) return;
-    for (const idx of state.target) tileAt(idx).classList.remove("lit");
-    if (MODES[state.mode].timed) resumeTimer();
+    if (ordered) {
+      // Sequence mode: flash each tile one at a time, in order.
+      promptEl.textContent = "Watch the order";
+      const stepOn = clamp(560 - state.level * 12, 280, 560);
+      for (let k = 0; k < state.order.length; k++) {
+        if (!state.playing) return;
+        const t = tileAt(state.order[k]);
+        t.classList.add("lit");
+        sfx.correct(k);
+        await wait(stepOn);
+        if (!state.playing) return;
+        t.classList.remove("lit");
+        await wait(130);
+      }
+    } else {
+      sfx.flash();
+      for (const idx of state.target) tileAt(idx).classList.add("lit");
+      if (MODES[state.mode].timed) pauseTimer();
+      await wait(flashMs);
+      if (!state.playing) return;
+      for (const idx of state.target) tileAt(idx).classList.remove("lit");
+      if (MODES[state.mode].timed) resumeTimer();
+    }
 
     await wait(240);
     if (!state.playing) return;
-    promptEl.textContent = `Tap ${state.target.size} tile${
-      state.target.size > 1 ? "s" : ""
-    }`;
+    promptEl.textContent = ordered
+      ? `Tap the order — ${state.order.length}`
+      : `Tap ${state.target.size} tile${state.target.size > 1 ? "s" : ""}`;
     boardEl.classList.add("interactive");
     state.locked = false;
     renderPowerups();
@@ -520,6 +564,24 @@
       return;
 
     state.taps++;
+
+    // Sequence mode: only the next tile in the order counts.
+    if (MODES[state.mode].ordered) {
+      if (index === state.order[state.seqStep]) {
+        state.hits++;
+        state.found.add(index);
+        state.seqStep++;
+        tile.classList.add("correct");
+        sfx.correct(state.seqStep);
+        if (state.seqStep === state.order.length) roundWon();
+      } else {
+        tile.classList.add("wrong");
+        sfx.wrong();
+        missed(tile);
+      }
+      return;
+    }
+
     if (state.target.has(index)) {
       state.hits++;
       state.found.add(index);
@@ -545,6 +607,7 @@
     if (perfect) {
       state.combo = Math.min(state.combo + 1, 9);
       granted = earnPowerups(state.combo);
+      adapt(-30); // cleared cleanly — tighten the flash a little
     }
     state.bestCombo = Math.max(state.bestCombo, state.combo);
 
@@ -594,6 +657,7 @@
 
   function missed(wrongTile) {
     state.roundMisses = (state.roundMisses || 0) + 1;
+    adapt(90); // missed — give a bit more time next round
     // A miss breaks the combo.
     if (state.combo > 1) {
       state.combo = 1;
@@ -679,15 +743,34 @@
     const wasLocked = state.locked;
     state.locked = true;
     if (MODES[state.mode].timed) pauseTimer();
-    // Re-flash the tiles not yet found.
-    const reveal = [...state.target].filter((i) => !state.found.has(i));
-    for (const i of reveal) tileAt(i).classList.add("lit");
-    promptEl.textContent = "Peek";
-    await wait(680);
-    if (!state.playing) return;
-    for (const i of reveal) tileAt(i).classList.remove("lit");
+
+    if (MODES[state.mode].ordered) {
+      // Re-flash the rest of the sequence, in order.
+      const remaining = state.order.slice(state.seqStep);
+      for (let k = 0; k < remaining.length; k++) {
+        if (!state.playing) return;
+        const t = tileAt(remaining[k]);
+        t.classList.add("lit");
+        sfx.correct(k);
+        await wait(340);
+        if (!state.playing) return;
+        t.classList.remove("lit");
+        await wait(110);
+      }
+    } else {
+      // Re-flash the tiles not yet found.
+      const reveal = [...state.target].filter((i) => !state.found.has(i));
+      for (const i of reveal) tileAt(i).classList.add("lit");
+      promptEl.textContent = "Peek";
+      await wait(680);
+      if (!state.playing) return;
+      for (const i of reveal) tileAt(i).classList.remove("lit");
+    }
+
     if (MODES[state.mode].timed) resumeTimer();
-    promptEl.textContent = `Tap ${state.target.size - state.found.size} more`;
+    promptEl.textContent = MODES[state.mode].ordered
+      ? `Tap the order — ${state.order.length - state.seqStep} left`
+      : `Tap ${state.target.size - state.found.size} more`;
     state.locked = wasLocked;
     renderPowerups();
   }
@@ -706,6 +789,7 @@
         if (t) t.classList.add("correct");
       }
     }
+    state.seqStep = state.order.length; // sequence is fully resolved
     roundWon();
   }
 
@@ -896,6 +980,7 @@
     comboEl.classList.remove("show");
     powerupsEl.classList.remove("show", "reserved");
     backBtn.hidden = true;
+    rollSubtitle();
     showScreen("home");
     syncHomeHints();
   }
@@ -911,7 +996,23 @@
     $("end-detail").textContent =
       detail + (r.combo >= 2 ? ` · best ×${r.combo}` : "");
     $("end-best").hidden = !r.isBest;
+    $("copy-result").hidden = r.mode !== "daily";
     showScreen("end");
+  }
+
+  /* ============================================================
+     Daily share string (Wordle-style, spoiler-free)
+     ============================================================ */
+  function dailyIndex() {
+    const epoch = new Date("2025-01-01T00:00:00");
+    const today = new Date(todayKey() + "T00:00:00");
+    return Math.max(1, Math.round((today - epoch) / 86400000) + 1);
+  }
+  function dailyShareText(r) {
+    const filled = Math.min(5, Math.max(1, Math.ceil(r.level / 3)));
+    let bar = "";
+    for (let i = 0; i < 5; i++) bar += i < filled ? "🟦" : "⬜";
+    return `Recall Daily #${dailyIndex()}\nLevel ${r.level} · ${r.score} pts\n${bar}`;
   }
 
   /* ============================================================
@@ -929,6 +1030,7 @@
     $("best-endless").textContent = stats.best.endless || 0;
     $("best-sprint").textContent = stats.best.sprint || 0;
     $("best-daily").textContent = stats.best.daily || 0;
+    $("best-sequence").textContent = stats.best.sequence || 0;
     // A streak counts as current only if you played today or yesterday.
     const last = stats.streak.last;
     const live =
@@ -1066,7 +1168,10 @@
 
     ctx.fillStyle = sub;
     ctx.font = "500 46px -apple-system, Helvetica, Arial, sans-serif";
-    const modeName = r.mode.charAt(0).toUpperCase() + r.mode.slice(1);
+    const modeName =
+      r.mode === "sequence"
+        ? "Order"
+        : r.mode.charAt(0).toUpperCase() + r.mode.slice(1);
     ctx.fillText(`${modeName} · Level ${r.level}`, W / 2, 850);
     if (r.combo >= 2)
       ctx.fillText(`Best combo ×${r.combo}`, W / 2, 910);
@@ -1152,7 +1257,7 @@
     buttons.forEach((b, i) => b.classList.toggle("is-active", i === idx));
   }
 
-  function initSwitch(id, key) {
+  function initSwitch(id, key, onToggle) {
     const sw = $(id);
     const set = (on) => {
       sw.classList.toggle("is-on", on);
@@ -1168,7 +1273,23 @@
         sfx.correct(2);
       }
       if (key === "haptics" && prefs.haptics) vibrate(12);
+      if (onToggle) onToggle(prefs[key]);
     });
+  }
+
+  function applyContrast() {
+    document.documentElement.toggleAttribute("data-contrast", !!prefs.contrast);
+  }
+
+  // The home subtitle is usually "Memory, beautifully simple." — but every so
+  // often it carries a little message. ♥
+  function rollSubtitle() {
+    const el = $("hero-sub");
+    if (!el) return;
+    el.textContent =
+      Math.random() < 0.25
+        ? "Anna, I love you!"
+        : "Memory, beautifully simple.";
   }
 
   function syncHomeHints() {
@@ -1196,15 +1317,45 @@
   });
   initSwitch("sound-toggle", "sound");
   initSwitch("haptics-toggle", "haptics");
+  initSwitch("adaptive-toggle", "adaptive");
+  initSwitch("contrast-toggle", "contrast", applyContrast);
 
   $("play-btn").addEventListener("click", newGame);
   $("again-btn").addEventListener("click", newGame);
   $("end-home").addEventListener("click", goHome);
   $("share-btn").addEventListener("click", shareResult);
+  $("copy-result").addEventListener("click", async () => {
+    const r = state.lastResult;
+    if (!r) return;
+    const text = dailyShareText(r);
+    const btn = $("copy-result");
+    const flash = () => {
+      btn.textContent = "Copied!";
+      setTimeout(() => (btn.textContent = "Copy daily result"), 1500);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(text);
+        flash();
+        return;
+      } catch {
+        /* fall through */
+      }
+    }
+    if (navigator.share) {
+      try {
+        await navigator.share({ text });
+      } catch {
+        /* user cancelled */
+      }
+    }
+  });
   backBtn.addEventListener("click", goHome);
 
   $("open-settings").addEventListener("click", () => showScreen("settings"));
   $("open-help").addEventListener("click", () => showScreen("help"));
+  $("tut-start").addEventListener("click", finishTutorial);
+  $("tut-skip").addEventListener("click", finishTutorial);
   $("open-stats").addEventListener("click", () => {
     renderStatsScreen();
     showScreen("stats");
@@ -1231,11 +1382,12 @@
       stats.correctTaps = 0;
       stats.bestLevel = 0;
       stats.bestCombo = 0;
-      stats.best = { endless: 0, sprint: 0, daily: 0 };
+      stats.best = { endless: 0, sprint: 0, daily: 0, sequence: 0 };
       stats.recent = [];
       stats.streak = { current: 0, longest: 0, last: null };
       stats.playDays = [];
       stats.achievements = [];
+      stats.calib = 0;
       saveStats();
       renderStatsScreen();
     }
@@ -1348,10 +1500,26 @@
 
     startQuotes();
     $("app-version").textContent = "v" + VERSION;
+    rollSubtitle();
+    applyContrast();
 
     // Idle board behind the home screen.
     buildBoard(3);
-    showScreen("home");
+
+    // First run: walk the player through a guided round.
+    let seen = false;
+    try {
+      seen = !!localStorage.getItem(TUT_KEY);
+    } catch {
+      seen = true;
+    }
+    if (seen) {
+      showScreen("home");
+    } else {
+      Object.values(screens).forEach((s) => (s.hidden = true));
+      $("tutorial-screen").hidden = false;
+      startTutorial();
+    }
   }
 
   /* ============================================================
@@ -1391,6 +1559,76 @@
         fig.classList.remove("fade");
       }, 600);
     }, 7000);
+  }
+
+  /* ============================================================
+     First-run tutorial — a single guided round
+     ============================================================ */
+  const TUT_KEY = "recall.tutorialSeen";
+  function startTutorial() {
+    const board = $("tut-board");
+    const coach = $("tut-coach");
+    const dotsEl = $("tut-dots");
+    const startBtn = $("tut-start");
+    startBtn.hidden = true;
+    board.style.gridTemplateColumns = "repeat(3, 1fr)";
+    board.innerHTML = "";
+    dotsEl.innerHTML = "";
+
+    const tiles = [];
+    for (let i = 0; i < 9; i++) {
+      const t = document.createElement("button");
+      t.className = "tile";
+      t.disabled = true;
+      board.appendChild(t);
+      tiles.push(t);
+    }
+    const target = [1, 3, 5, 7]; // a simple diamond
+    for (let i = 0; i < target.length; i++) dotsEl.appendChild(document.createElement("i"));
+    const dots = [...dotsEl.children];
+    const found = new Set();
+
+    coach.textContent = "Watch which tiles light up.";
+    setTimeout(() => target.forEach((i) => tiles[i].classList.add("lit")), 700);
+    setTimeout(() => {
+      target.forEach((i) => tiles[i].classList.remove("lit"));
+      coach.textContent = "Now tap them all — in any order.";
+      tiles.forEach((t, i) => {
+        t.disabled = false;
+        t.addEventListener("pointerdown", () => tutTap(i));
+      });
+    }, 2200);
+
+    function tutTap(i) {
+      if (found.has(i)) return;
+      if (target.includes(i)) {
+        found.add(i);
+        tiles[i].classList.add("correct");
+        tiles[i].disabled = true;
+        ac();
+        sfx.correct(found.size);
+        dots[found.size - 1].classList.add("on");
+        if (found.size === target.length) {
+          coach.textContent = "That's it — clear boards to go further.";
+          startBtn.hidden = false;
+        }
+      } else {
+        tiles[i].classList.add("wrong");
+        sfx.wrong();
+        setTimeout(() => tiles[i].classList.remove("wrong"), 450);
+      }
+    }
+  }
+  function finishTutorial() {
+    try {
+      localStorage.setItem(TUT_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+    $("tutorial-screen").hidden = true;
+    rollSubtitle();
+    showScreen("home");
+    syncHomeHints();
   }
 
   init();
