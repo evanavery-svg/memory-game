@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.0";
+  const VERSION = "1.1";
 
   /* ============================================================
      Elements
@@ -1106,11 +1106,14 @@
       gap = 12;
     const cell = (size - pad * 2 - gap * 2) / 3;
     const on = new Set([0, 4, 5, 7]);
+    // Unlit cells are a faint tint of the page background so they read against
+    // the mark in both light (black mark) and dark (white mark) themes.
+    const off = bg === "#000000" ? "rgba(0,0,0,0.28)" : "rgba(255,255,255,0.18)";
     for (let i = 0; i < 9; i++) {
       const cx = x + pad + (i % 3) * (cell + gap);
       const cy = y + pad + Math.floor(i / 3) * (cell + gap);
       roundRect(ctx, cx, cy, cell, cell, 8);
-      ctx.fillStyle = on.has(i) ? bg : "rgba(255,255,255,0.18)";
+      ctx.fillStyle = on.has(i) ? bg : off;
       ctx.fill();
     }
   }
@@ -1289,9 +1292,13 @@
     reader.readAsText(file);
   });
 
-  // Keyboard: space/enter starts from home or end screen.
+  // Keyboard: space/enter starts from home or end screen — but only when no
+  // control is focused, so it doesn't fire alongside a button/link/segment
+  // activation (which would otherwise start two games or open a screen at once).
   document.addEventListener("keydown", (e) => {
     if (e.key !== " " && e.key !== "Enter") return;
+    if (e.target.closest("button, a, input, select, textarea, [role='switch'], [role='tab']"))
+      return;
     if (!screens.home.hidden || !screens.end.hidden) {
       e.preventDefault();
       newGame();

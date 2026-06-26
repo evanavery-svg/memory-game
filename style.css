@@ -235,8 +235,7 @@ body {
     border-color 0.18s var(--ease);
 }
 
-/* Only the tile being pressed gets promoted — avoids a layer per tile. */
-.tile.tap,
+/* Only the lit tile gets promoted — avoids a compositor layer per tile. */
 .tile.lit {
   will-change: transform;
 }
