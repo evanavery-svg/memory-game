@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/icon-180.png" />
   <link rel="icon" href="icons/icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=1.4" />
+  <link rel="stylesheet" href="style.css?v=1.5" />
   <title>Recall</title>
 </head>
 <body>
@@ -258,6 +258,34 @@
       </div>
     </section>
 
+    <!-- ===== First-run "Add to Home Screen" hint (iOS Safari) ===== -->
+    <section class="screen" id="a2hs-screen" hidden role="dialog" aria-modal="true" aria-labelledby="a2hs-title">
+      <div class="screen-inner">
+        <div class="a2hs-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="34" height="34"><rect x="3.5" y="3.5" width="17" height="17" rx="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 8v8M8 12h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+        <p class="end-kicker">Install Recall</p>
+        <h2 class="screen-title" id="a2hs-title">Add to your Home Screen</h2>
+        <p class="field-hint">Play full-screen and offline, one tap away.</p>
+        <ol class="a2hs-steps">
+          <li class="a2hs-step">
+            <span class="a2hs-ico a2hs-share" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 3v12M8.5 6.5 12 3l3.5 3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 10.5H5.5A1.5 1.5 0 0 0 4 12v6.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V12a1.5 1.5 0 0 0-1.5-1.5H17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+            <span class="a2hs-text">Tap the <b>Share</b> button in Safari's toolbar.</span>
+          </li>
+          <li class="a2hs-step">
+            <span class="a2hs-ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20"><rect x="3.5" y="3.5" width="17" height="17" rx="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 8v8M8 12h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </span>
+            <span class="a2hs-text">Choose <b>Add to Home Screen</b>.</span>
+          </li>
+        </ol>
+        <button class="cta" id="a2hs-got-it">Got it</button>
+        <button class="link-btn" id="a2hs-later">Not now</button>
+      </div>
+    </section>
+
     <!-- ===== End screen ===== -->
     <section class="screen" id="end-screen" hidden>
       <div class="screen-inner">
@@ -278,6 +306,6 @@
     <canvas id="share-canvas" width="1080" height="1350" hidden></canvas>
   </main>
 
-  <script src="game.js?v=1.4"></script>
+  <script src="game.js?v=1.5"></script>
 </body>
 </html>

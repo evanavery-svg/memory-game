@@ -58,7 +58,8 @@ No build step, no dependencies.
 - **Installable PWA** — manifest, icons, and a service worker for full offline
   play. Online, the app loads network-first so you always get the latest
   version, and it auto-reloads once when a new version takes over — no manual
-  refresh or reinstall.
+  refresh or reinstall. First-time iOS Safari visitors get a one-time hint
+  showing the Share → Add to Home Screen flow.
 
 ## Files
 

@@ -1204,6 +1204,59 @@ body {
   margin: 10px auto 0;
 }
 
+/* ---------- Add to Home Screen hint ---------- */
+.a2hs-mark {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 18px;
+  border-radius: 18px;
+  background: var(--ink);
+  color: var(--bg);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 12px 30px var(--shadow);
+}
+.a2hs-steps {
+  list-style: none;
+  margin: 22px 0 26px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.a2hs-step {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-align: left;
+  font-size: 15.5px;
+  line-height: 1.35;
+}
+.a2hs-step b {
+  font-weight: 600;
+}
+.a2hs-ico {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--bg);
+  display: grid;
+  place-items: center;
+}
+.a2hs-share {
+  animation: a2hsBob 1.8s var(--ease) infinite;
+}
+@keyframes a2hsBob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+#a2hs-later {
+  display: block;
+  margin: 10px auto 0;
+}
+
 /* ---------- High contrast ---------- */
 :root[data-contrast] {
   --tile: var(--bg);

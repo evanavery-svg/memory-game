@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.4";
+  const VERSION = "1.5";
 
   /* ============================================================
      Elements
@@ -41,6 +41,7 @@
      ============================================================ */
   const PREFS_KEY = "recall.prefs";
   const STATS_KEY = "recall.stats";
+  const A2HS_KEY = "recall.a2hsSeen";
 
   const prefs = Object.assign(
     {
@@ -1002,6 +1003,47 @@
     });
   }
 
+  /* ============================================================
+     First-run "Add to Home Screen" hint (iOS Safari only)
+     ============================================================ */
+  // Safari is the only iOS browser that can add a web app to the home screen,
+  // and it's the only one whose share sheet exposes the option — so the hint is
+  // scoped to it. Chrome/Firefox/Edge/Opera on iOS are excluded.
+  function isIosSafari() {
+    const ua = navigator.userAgent;
+    const iOS =
+      /iPhone|iPad|iPod/.test(ua) ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1); // iPadOS 13+ poses as Mac
+    return iOS && /WebKit/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);
+  }
+  function isStandalone() {
+    return (
+      navigator.standalone === true ||
+      window.matchMedia("(display-mode: standalone)").matches
+    ); // already installed — no need to nag
+  }
+  function maybePromptA2HS() {
+    let seen = true;
+    try {
+      seen = !!localStorage.getItem(A2HS_KEY);
+    } catch {
+      seen = true;
+    }
+    if (seen || state.playing || !isIosSafari() || isStandalone()) return;
+    // Let the home screen settle first so it doesn't stack on a transition.
+    setTimeout(() => {
+      if (!state.playing) $("a2hs-screen").hidden = false;
+    }, 700);
+  }
+  function dismissA2HS() {
+    try {
+      localStorage.setItem(A2HS_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+    closeScreen($("a2hs-screen"));
+  }
+
   function goHome() {
     state.playing = false;
     stopTimer();
@@ -1385,6 +1427,8 @@
   $("open-help").addEventListener("click", () => showScreen("help"));
   $("tut-start").addEventListener("click", finishTutorial);
   $("tut-skip").addEventListener("click", finishTutorial);
+  $("a2hs-got-it").addEventListener("click", dismissA2HS);
+  $("a2hs-later").addEventListener("click", dismissA2HS);
   $("open-stats").addEventListener("click", () => {
     renderStatsScreen();
     showScreen("stats");
@@ -1544,6 +1588,7 @@
     }
     if (seen) {
       showScreen("home");
+      maybePromptA2HS();
     } else {
       Object.values(screens).forEach((s) => (s.hidden = true));
       $("tutorial-screen").hidden = false;
@@ -1658,6 +1703,7 @@
     rollSubtitle();
     showScreen("home");
     syncHomeHints();
+    maybePromptA2HS();
   }
 
   init();
