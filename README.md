@@ -45,7 +45,9 @@ No build step, no dependencies.
 - **Shareable result card** — a generated black-and-white image of your score
   via the native share sheet (with a download fallback).
 - **Installable PWA** — manifest, icons, and a service worker for full offline
-  play.
+  play. Online, the app loads network-first so you always get the latest
+  version, and it auto-reloads once when a new version takes over — no manual
+  refresh or reinstall.
 
 ## Files
 

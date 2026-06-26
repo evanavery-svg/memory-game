@@ -1389,8 +1389,21 @@
      Service worker (offline)
      ============================================================ */
   if ("serviceWorker" in navigator) {
+    // When a freshly installed worker takes control, reload exactly once so the
+    // new version applies without a manual refresh. Guarded against the first
+    // ever install (no prior controller) and against reload loops.
+    let reloading = false;
+    const hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (reloading || !hadController) return;
+      reloading = true;
+      window.location.reload();
+    });
     window.addEventListener("load", () => {
-      navigator.serviceWorker.register("sw.js").catch(() => {});
+      navigator.serviceWorker
+        .register("sw.js")
+        .then((reg) => reg.update().catch(() => {}))
+        .catch(() => {});
     });
   }
 })();

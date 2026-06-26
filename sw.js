@@ -1,5 +1,5 @@
 /* Recall service worker — offline-first caching */
-const CACHE = "recall-v8";
+const CACHE = "recall-v9";
 const ASSETS = [
   "./",
   "./index.html",
@@ -29,37 +29,57 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+// Network-first: fetch fresh, update the cache, fall back to cache when offline.
+function networkFirst(request, fallbackKey) {
+  const key = fallbackKey || request;
+  return fetch(request)
+    .then((res) => {
+      if (res && res.ok && res.type === "basic") {
+        const copy = res.clone();
+        caches.open(CACHE).then((c) => c.put(key, copy));
+      }
+      return res;
+    })
+    .catch(() =>
+      caches.match(key).then((cached) => cached || caches.match("./index.html"))
+    );
+}
+
+// Cache-first: serve from cache, otherwise fetch and store.
+function cacheFirst(request) {
+  return caches.match(request).then(
+    (cached) =>
+      cached ||
+      fetch(request).then((res) => {
+        if (res.ok && res.type === "basic") {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(request, copy));
+        }
+        return res;
+      })
+  );
+}
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;
+  const url = new URL(request.url);
+  const sameOrigin = url.origin === self.location.origin;
 
-  // Network-first for navigation, cache-first for assets.
+  // The app shell (the page itself) is always network-first so an online
+  // visitor gets the newest version, with the cached copy as offline fallback.
   if (request.mode === "navigate") {
-    event.respondWith(
-      fetch(request)
-        .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put("./index.html", copy));
-          return res;
-        })
-        .catch(() => caches.match("./index.html"))
-    );
+    event.respondWith(networkFirst(request, "./index.html"));
     return;
   }
 
-  event.respondWith(
-    caches.match(request).then(
-      (cached) =>
-        cached ||
-        fetch(request)
-          .then((res) => {
-            if (res.ok && res.type === "basic") {
-              const copy = res.clone();
-              caches.open(CACHE).then((c) => c.put(request, copy));
-            }
-            return res;
-          })
-          .catch(() => cached)
-    )
-  );
+  // Core same-origin assets (HTML/CSS/JS/manifest) are also network-first, so
+  // the latest code is fetched whenever you're online. Icons rarely change and
+  // are heavy, so they stay cache-first for speed.
+  if (sameOrigin && !url.pathname.includes("/icons/")) {
+    event.respondWith(networkFirst(request));
+    return;
+  }
+
+  event.respondWith(cacheFirst(request));
 });
