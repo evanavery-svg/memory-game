@@ -1,6 +1,8 @@
 (() => {
   "use strict";
 
+  const VERSION = "1.0";
+
   /* ============================================================
      Elements
      ============================================================ */
@@ -1335,6 +1337,7 @@
     setInterval(cycle, 1400);
 
     startQuotes();
+    $("app-version").textContent = "v" + VERSION;
 
     // Idle board behind the home screen.
     buildBoard(3);
