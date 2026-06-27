@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.9.2";
+  const VERSION = "1.9.3";
 
   /* ============================================================
      Elements
@@ -1064,6 +1064,8 @@
     mq.style.transition = "";
     mq.style.opacity = "";
     mq.style.transform = "";
+    mq.style.top = "";
+    mq.style.bottom = "";
     rollSubtitle();
     showScreen("home");
     syncHomeHints();
@@ -1649,18 +1651,29 @@
     $("solo-quote-by").textContent = q.by;
   }
 
-  // Lift the quote from its resting place (bottom of the mode screen) up to the
-  // vertical centre of the viewport, and remember how far it travelled.
+  // Park the quote just beneath the (still-hidden but laid-out) mode nav, so it
+  // comes to rest right below Stats / Settings / How to play.
+  function restQuoteBelowNav(quote) {
+    const nav = screens.modes.querySelector(".home-nav");
+    if (!nav) return;
+    const r = nav.getBoundingClientRect();
+    quote.style.bottom = "auto";
+    quote.style.top = Math.round(r.bottom + 24) + "px";
+  }
+
+  // Lift the quote from its resting place up to the vertical centre of the
+  // viewport, and remember how far it travelled.
   function centerQuote(quote) {
     quote.style.transform = "translateY(0) scale(1)";
     const r = quote.getBoundingClientRect();
     const delta = window.innerHeight / 2 - (r.top + r.height / 2);
     quote.dataset.delta = String(delta);
-    quote.style.transform = `translateY(${delta}px) scale(1.05)`;
+    quote.style.transform = `translateY(${delta}px) scale(1.04)`;
   }
 
   // Play on the landing screen → cross-fade to a single centred quote, hold it
-  // for 3s, then let it drop into place while the mode bar fades in.
+  // for 3s, then let it float down. The mode bar only appears once the float
+  // has fully completed.
   function enterModes() {
     if (state.playing) return;
     const screen = screens.modes;
@@ -1677,6 +1690,7 @@
     closeScreen(screens.home); // landing cross-fades away beneath it
 
     requestAnimationFrame(() => {
+      restQuoteBelowNav(quote);
       centerQuote(quote);
       requestAnimationFrame(() => {
         quote.style.transition = ""; // restore the CSS opacity transition
@@ -1685,28 +1699,35 @@
     });
 
     clearTimeout(quoteTimer);
-    quoteTimer = setTimeout(() => revealModes(quote), 3000);
+    quoteTimer = setTimeout(() => floatDown(quote), 3000);
   }
 
-  function revealModes(quote) {
-    const screen = screens.modes;
+  function floatDown(quote) {
     const delta = parseFloat(quote.dataset.delta || "0");
-    screen.classList.remove("quoting"); // mode bar + mark fade/slide in
-    syncHomeHints();
 
-    // Let the quote float down to its resting place — slow, even, weightless,
-    // with a long soft landing. A gentle curve (low initial velocity, no fast
-    // drop, a lingering decelerating tail) keeps it classy rather than abrupt.
+    // The mode bar, brand and copyright stay hidden until the quote has fully
+    // settled — they fade in only once the float completes.
+    const reveal = () => {
+      screens.modes.classList.remove("quoting");
+      syncHomeHints();
+    };
+
+    // Float the quote down to its resting place — slow, even, weightless, with
+    // a soft landing. A gentle ease-in-out (no fast initial drop) keeps it
+    // classy rather than abrupt.
     quote.style.transform = "translateY(0) scale(1)";
-    if (!prefersReducedMotion()) {
-      quote.animate(
-        [
-          { transform: `translateY(${delta}px) scale(1.05)` },
-          { transform: "translateY(0) scale(1)" },
-        ],
-        { duration: 2100, easing: "cubic-bezier(0.37, 0, 0.63, 1)" }
-      );
+    if (prefersReducedMotion()) {
+      reveal();
+      return;
     }
+    const anim = quote.animate(
+      [
+        { transform: `translateY(${delta}px) scale(1.04)` },
+        { transform: "translateY(0) scale(1)" },
+      ],
+      { duration: 2000, easing: "cubic-bezier(0.37, 0, 0.63, 1)" }
+    );
+    anim.onfinish = reveal;
   }
 
   /* ============================================================

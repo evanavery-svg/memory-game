@@ -725,11 +725,11 @@ body {
 }
 
 /* ---------- Mode screen: the quote that floats down from centre ---------- */
+/* Its resting `top` is set in JS so it lands just below the mode nav. */
 .modes-quote {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: max(64px, calc(env(safe-area-inset-bottom) + 48px));
   margin: 0 auto;
   max-width: 320px;
   min-height: 0;
@@ -742,17 +742,28 @@ body {
   line-height: 1.5;
 }
 
-/* The mode bar eases in a touch slower, to match the quote's unhurried float. */
-.modes-screen:not(.quoting) .modes-inner {
-  animation: screenIn 0.75s var(--ease);
+/* Copyright pinned to the foot of the mode screen. */
+.modes-copy {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: max(22px, calc(env(safe-area-inset-bottom) + 12px));
+  margin: 0;
+  transition: opacity 0.8s var(--ease);
 }
 
-/* Quote-only phase: hide the bar + brand, let the quote stand alone. */
+/* The mode bar eases in once the float finishes, matched to the brand/copy. */
+.modes-screen:not(.quoting) .modes-inner {
+  animation: screenIn 0.7s var(--ease);
+}
+
+/* Quote-only phase: hide the bar, brand and copyright — the quote stands alone. */
 .modes-screen.quoting .modes-inner {
   animation: none;
   opacity: 0;
 }
-.modes-screen.quoting .mode-brand {
+.modes-screen.quoting .mode-brand,
+.modes-screen.quoting .modes-copy {
   opacity: 0;
 }
 
