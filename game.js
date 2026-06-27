@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.10.0";
+  const VERSION = "1.10.1";
 
   /* ============================================================
      Elements
@@ -1311,6 +1311,35 @@
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
+  // Share the app itself — invite someone to play. Native share sheet when
+  // available, otherwise copy the link with a brief "Copied!" confirmation.
+  async function shareApp() {
+    const url = location.origin + location.pathname;
+    const text = "Recall — a minimalist memory game. Can you keep up?";
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "Recall", text, url });
+        return;
+      } catch {
+        /* user cancelled — done */
+        return;
+      }
+    }
+    const btn = $("share-app");
+    const flash = () => {
+      btn.textContent = "Copied!";
+      setTimeout(() => (btn.textContent = "Share"), 1500);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(url);
+        flash();
+      } catch {
+        /* clipboard blocked — nothing more to do */
+      }
+    }
+  }
+
   function drawMark(ctx, x, y, size, ink, bg) {
     const r = 36;
     roundRect(ctx, x, y, size, size, r);
@@ -1465,6 +1494,7 @@
 
   $("open-settings").addEventListener("click", () => showScreen("settings"));
   $("open-help").addEventListener("click", () => showScreen("help"));
+  $("share-app").addEventListener("click", shareApp);
   $("tut-start").addEventListener("click", finishTutorial);
   $("tut-skip").addEventListener("click", finishTutorial);
   $("a2hs-got-it").addEventListener("click", dismissA2HS);

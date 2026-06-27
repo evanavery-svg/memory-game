@@ -66,7 +66,9 @@ No build step, no dependencies.
 - **Back up & restore** — export your progress to a JSON file and import it on
   another device.
 - **Shareable result card** — a generated black-and-white image of your score
-  via the native share sheet (with a download fallback).
+  via the native share sheet (with a download fallback). A **Share** link in the
+  menu also invites a friend to play — the native share sheet when available, or
+  the app link copied to your clipboard otherwise.
 - **Installable PWA** — manifest, icons, and a service worker for full offline
   play. Online, the app loads network-first so you always get the latest
   version, and it auto-reloads once when a new version takes over — no manual
