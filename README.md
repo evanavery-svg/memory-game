@@ -6,6 +6,10 @@ tile you saw. Clear a board and a new, slightly harder one appears.
 Designed mobile-first to feel like an Apple product: black and white only,
 generous whitespace, soft spring motion. Works great on desktop too.
 
+The landing screen is deliberately spare — just the mark, the name, and a
+single **Play** button. Tapping it fades to a quiet memory quote for five
+seconds before the mode bar (and Stats, Settings, How to play) fades in.
+
 ## Play
 
 Open `index.html` in any modern browser, or serve the folder and add it to your

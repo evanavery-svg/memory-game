@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.8";
+  const VERSION = "1.9";
 
   /* ============================================================
      Elements
@@ -18,6 +18,7 @@
   const comboEl = $("combo");
   const comboX = $("combo-x");
   const backBtn = $("back-btn");
+  const wordmark = $("wordmark");
   const themeColorMeta = $("theme-color");
   const powerupsEl = $("powerups");
   const peekBtn = $("power-peek");
@@ -29,6 +30,7 @@
 
   const screens = {
     home: $("home-screen"),
+    modes: $("modes-screen"),
     settings: $("settings-screen"),
     stats: $("stats-screen"),
     help: $("help-screen"),
@@ -926,6 +928,7 @@
     hudEl.hidden = false;
     comboEl.classList.remove("show");
     backBtn.hidden = false;
+    wordmark.hidden = false;
     powerupsEl.classList.remove("show", "reserved");
     checkpointEl.hidden = true;
     renderHUD();
@@ -1049,10 +1052,14 @@
   function goHome() {
     state.playing = false;
     stopTimer();
+    clearTimeout(quoteTimer);
     hudEl.hidden = true;
     comboEl.classList.remove("show");
     powerupsEl.classList.remove("show", "reserved");
     backBtn.hidden = true;
+    wordmark.hidden = true;
+    $("quote-screen").hidden = true;
+    $("quote-screen").classList.remove("show");
     rollSubtitle();
     showScreen("home");
     syncHomeHints();
@@ -1370,7 +1377,7 @@
       ? "Today’s Daily is done. New boards at midnight."
       : MODES[prefs.mode].hint;
     $("diff-hint").textContent = DIFFS[prefs.difficulty].hint;
-    const play = $("play-btn");
+    const play = $("start-btn");
     play.disabled = dailyLocked;
     play.textContent = dailyLocked ? "Come back tomorrow" : "Play";
   }
@@ -1393,7 +1400,8 @@
   initSwitch("adaptive-toggle", "adaptive");
   initSwitch("contrast-toggle", "contrast", applyContrast);
 
-  $("play-btn").addEventListener("click", newGame);
+  $("play-btn").addEventListener("click", enterModes);
+  $("start-btn").addEventListener("click", newGame);
   $("again-btn").addEventListener("click", newGame);
   $("end-home").addEventListener("click", goHome);
   $("share-btn").addEventListener("click", shareResult);
@@ -1444,7 +1452,8 @@
       } else if (state.playing) {
         closeScreen(screen);
       } else {
-        showScreen("home");
+        // Settings/Stats/Help are reached from the mode bar — go back to it.
+        showScreen("modes");
         syncHomeHints();
       }
     })
@@ -1575,7 +1584,6 @@
     cycle();
     setInterval(cycle, 1400);
 
-    startQuotes();
     $("app-version").textContent = "v" + VERSION;
     rollSubtitle();
     applyContrast();
@@ -1601,7 +1609,9 @@
   }
 
   /* ============================================================
-     Home quotes — a little inspiration on memory & the mind
+     Quote interstitial — a little inspiration on memory & the mind.
+     One quote shows for ~5s after Play, then the mode bar fades in.
+     They advance each time, so consecutive runs never repeat.
      ============================================================ */
   const QUOTES = [
     { t: "Memory is the treasury and guardian of all things.", by: "Cicero" },
@@ -1615,46 +1625,40 @@
     { t: "Attention is the rarest and purest form of generosity.", by: "Simone Weil" },
     { t: "Nothing fixes a thing so intensely in the memory as the wish to forget it.", by: "Montaigne" },
   ];
-  function startQuotes() {
-    const fig = $("home-quote");
-    const txt = $("quote-text");
-    const by = $("quote-by");
-    if (!fig || !txt || !by) return;
-    let i = Math.floor(Math.random() * QUOTES.length);
-    const paint = () => {
-      const q = QUOTES[i % QUOTES.length];
-      txt.textContent = "“" + q.t + "”";
-      by.textContent = q.by;
-    };
-    paint();
-    let rotating = false;
-    setInterval(() => {
-      // Only rotate while the home screen is visible and not mid-rotation.
-      if (screens.home.hidden || rotating) return;
-      rotating = true;
+  let quoteIdx = Math.floor(Math.random() * QUOTES.length);
+  let quoteTimer = null;
 
-      // Swap the text only once the fade-out has truly finished, so the old and
-      // new quotes never paint at the same time (which looked like overlap on
-      // slower devices). transitionend is authoritative; the timeout is a
-      // fallback for when the element is hidden or motion is reduced.
-      let swapped = false;
-      const swap = () => {
-        if (swapped) return;
-        swapped = true;
-        i++;
-        paint();
-        // Let the new text commit at opacity 0 before fading it back in.
-        requestAnimationFrame(() =>
-          requestAnimationFrame(() => {
-            fig.classList.remove("fade");
-            rotating = false;
-          })
-        );
-      };
-      fig.addEventListener("transitionend", swap, { once: true });
-      setTimeout(swap, 750);
-      fig.classList.add("fade");
-    }, 7000);
+  function paintQuote() {
+    const q = QUOTES[quoteIdx % QUOTES.length];
+    $("solo-quote-text").textContent = "“" + q.t + "”";
+    $("solo-quote-by").textContent = q.by;
+  }
+
+  // Play on the landing screen → fade to a single quote (held 5s) → mode bar.
+  function enterModes() {
+    if (state.playing) return;
+    const qs = $("quote-screen");
+    paintQuote();
+    quoteIdx++; // next run gets the next quote
+
+    // Fade the quote backdrop in over the landing screen.
+    qs.hidden = false;
+    qs.classList.remove("show");
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => qs.classList.add("show"))
+    );
+
+    clearTimeout(quoteTimer);
+    quoteTimer = setTimeout(() => {
+      // Place the mode bar underneath the still-opaque quote, then fade the
+      // quote away so the bar is revealed (its inner runs the screenIn fade).
+      showScreen("modes");
+      syncHomeHints();
+      qs.classList.remove("show");
+      setTimeout(() => {
+        qs.hidden = true;
+      }, 600);
+    }, 5000);
   }
 
   /* ============================================================
