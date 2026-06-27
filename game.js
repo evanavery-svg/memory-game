@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.9";
+  const VERSION = "1.9.1";
 
   /* ============================================================
      Elements
@@ -1058,8 +1058,12 @@
     powerupsEl.classList.remove("show", "reserved");
     backBtn.hidden = true;
     wordmark.hidden = true;
-    $("quote-screen").hidden = true;
-    $("quote-screen").classList.remove("show");
+    // Reset the mode screen's quote/transition state for a clean next entry.
+    screens.modes.classList.remove("quoting");
+    const mq = $("modes-quote");
+    mq.style.transition = "";
+    mq.style.opacity = "";
+    mq.style.transform = "";
     rollSubtitle();
     showScreen("home");
     syncHomeHints();
@@ -1560,14 +1564,20 @@
     syncHomeHints();
     bestEl.textContent = stats.best[prefs.mode] || 0;
 
-    // Decorative animated mark on the home hero.
-    const mark = $("hero-mark");
-    const cells = [];
-    for (let i = 0; i < 9; i++) {
-      const c = document.createElement("i");
-      mark.appendChild(c);
-      cells.push(c);
-    }
+    // Decorative animated mark — on the home hero and the mode screen's
+    // top-left logo. Both cycle the same pattern so they stay in step.
+    const markCells = ["hero-mark", "mode-mark"]
+      .map($)
+      .filter(Boolean)
+      .map((mark) => {
+        const cells = [];
+        for (let i = 0; i < 9; i++) {
+          const c = document.createElement("i");
+          mark.appendChild(c);
+          cells.push(c);
+        }
+        return cells;
+      });
     const patterns = [
       [0, 4, 8],
       [2, 4, 6, 0],
@@ -1578,7 +1588,9 @@
     let pi = 0;
     const cycle = () => {
       const p = new Set(patterns[pi % patterns.length]);
-      cells.forEach((c, i) => c.classList.toggle("on", p.has(i)));
+      markCells.forEach((cells) =>
+        cells.forEach((c, i) => c.classList.toggle("on", p.has(i)))
+      );
       pi++;
     };
     cycle();
@@ -1628,37 +1640,71 @@
   let quoteIdx = Math.floor(Math.random() * QUOTES.length);
   let quoteTimer = null;
 
+  const prefersReducedMotion = () =>
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
   function paintQuote() {
     const q = QUOTES[quoteIdx % QUOTES.length];
     $("solo-quote-text").textContent = "“" + q.t + "”";
     $("solo-quote-by").textContent = q.by;
   }
 
-  // Play on the landing screen → fade to a single quote (held 5s) → mode bar.
+  // Lift the quote from its resting place (bottom of the mode screen) up to the
+  // vertical centre of the viewport, and remember how far it travelled.
+  function centerQuote(quote) {
+    quote.style.transform = "translateY(0) scale(1)";
+    const r = quote.getBoundingClientRect();
+    const delta = window.innerHeight / 2 - (r.top + r.height / 2);
+    quote.dataset.delta = String(delta);
+    quote.style.transform = `translateY(${delta}px) scale(1.08)`;
+  }
+
+  // Play on the landing screen → cross-fade to a single centred quote, hold it
+  // for 3s, then let it drop into place while the mode bar fades in.
   function enterModes() {
     if (state.playing) return;
-    const qs = $("quote-screen");
+    const screen = screens.modes;
+    const quote = $("modes-quote");
     paintQuote();
     quoteIdx++; // next run gets the next quote
 
-    // Fade the quote backdrop in over the landing screen.
-    qs.hidden = false;
-    qs.classList.remove("show");
-    requestAnimationFrame(() =>
-      requestAnimationFrame(() => qs.classList.add("show"))
-    );
+    // Reveal the mode screen in its quote-only phase, with the quote centred
+    // and ready to fade in.
+    screen.classList.add("quoting");
+    quote.style.transition = "none";
+    quote.style.opacity = "0";
+    screen.hidden = false;
+    closeScreen(screens.home); // landing cross-fades away beneath it
+
+    requestAnimationFrame(() => {
+      centerQuote(quote);
+      requestAnimationFrame(() => {
+        quote.style.transition = ""; // restore the CSS opacity transition
+        quote.style.opacity = "1"; // fade the quote in
+      });
+    });
 
     clearTimeout(quoteTimer);
-    quoteTimer = setTimeout(() => {
-      // Place the mode bar underneath the still-opaque quote, then fade the
-      // quote away so the bar is revealed (its inner runs the screenIn fade).
-      showScreen("modes");
-      syncHomeHints();
-      qs.classList.remove("show");
-      setTimeout(() => {
-        qs.hidden = true;
-      }, 600);
-    }, 5000);
+    quoteTimer = setTimeout(() => revealModes(quote), 3000);
+  }
+
+  function revealModes(quote) {
+    const screen = screens.modes;
+    const delta = parseFloat(quote.dataset.delta || "0");
+    screen.classList.remove("quoting"); // mode bar + mark fade/slide in
+    syncHomeHints();
+
+    // Drop the quote down to where it rests at the bottom of the screen.
+    quote.style.transform = "translateY(0) scale(1)";
+    if (!prefersReducedMotion()) {
+      quote.animate(
+        [
+          { transform: `translateY(${delta}px) scale(1.08)` },
+          { transform: "translateY(0) scale(1)" },
+        ],
+        { duration: 680, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }
+      );
+    }
   }
 
   /* ============================================================

@@ -7,8 +7,9 @@ Designed mobile-first to feel like an Apple product: black and white only,
 generous whitespace, soft spring motion. Works great on desktop too.
 
 The landing screen is deliberately spare — just the mark, the name, and a
-single **Play** button. Tapping it fades to a quiet memory quote for five
-seconds before the mode bar (and Stats, Settings, How to play) fades in.
+single **Play** button. Tapping it cross-fades to a quiet memory quote, held
+for three seconds; the quote then drops to the foot of the screen as the mode
+bar (and Stats, Settings, How to play) and a small top-left mark fade in.
 
 ## Play
 

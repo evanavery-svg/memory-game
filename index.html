@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/icon-180.png" />
   <link rel="icon" href="icons/icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=1.9" />
+  <link rel="stylesheet" href="style.css?v=1.9.1" />
   <title>Recall</title>
 </head>
 <body>
@@ -91,8 +91,9 @@
     </section>
 
     <!-- ===== Mode-select screen ===== -->
-    <section class="screen" id="modes-screen" hidden>
-      <div class="screen-inner">
+    <section class="screen modes-screen" id="modes-screen" hidden>
+      <div class="mode-mark" id="mode-mark" aria-hidden="true"></div>
+      <div class="screen-inner modes-inner">
         <div class="field">
           <label class="field-label">Mode</label>
           <div class="segmented mode-seg" id="mode-seg" data-store="mode" style="--count:4;--idx:0;" role="tablist">
@@ -113,6 +114,11 @@
           <button class="link-btn" id="open-help">How to play</button>
         </nav>
       </div>
+
+      <figure class="quote modes-quote" id="modes-quote">
+        <blockquote id="solo-quote-text"></blockquote>
+        <figcaption id="solo-quote-by"></figcaption>
+      </figure>
     </section>
 
     <!-- ===== Settings screen ===== -->
@@ -291,18 +297,10 @@
       </div>
     </section>
 
-    <!-- ===== Quote interstitial (between Play and mode select) ===== -->
-    <section class="screen quote-screen" id="quote-screen" hidden aria-hidden="true">
-      <figure class="quote quote-solo" id="solo-quote">
-        <blockquote id="solo-quote-text"></blockquote>
-        <figcaption id="solo-quote-by"></figcaption>
-      </figure>
-    </section>
-
     <!-- Hidden canvas for share-card rendering -->
     <canvas id="share-canvas" width="1080" height="1350" hidden></canvas>
   </main>
 
-  <script src="game.js?v=1.9"></script>
+  <script src="game.js?v=1.9.1"></script>
 </body>
 </html>
