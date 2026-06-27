@@ -1306,12 +1306,21 @@ body {
   width: 64px;
   height: 64px;
   margin: 0 auto 18px;
-  border-radius: 18px;
+  border-radius: 16px;
   background: var(--ink);
-  color: var(--bg);
   display: grid;
-  place-items: center;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 4px;
+  padding: 12px;
   box-shadow: 0 12px 30px var(--shadow);
+}
+.a2hs-mark i {
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.18);
+}
+.a2hs-mark i.on {
+  background: var(--bg);
 }
 .a2hs-steps {
   list-style: none;

@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.10.3";
+  const VERSION = "1.10.4";
 
   /* ============================================================
      Elements
@@ -1641,9 +1641,10 @@
     syncHomeHints();
     bestEl.textContent = stats.best[prefs.mode] || 0;
 
-    // Decorative animated mark — on the home hero and the mode screen's
-    // top-left logo. Both cycle the same pattern so they stay in step.
-    const markCells = ["hero-mark", "mode-mark"]
+    // Decorative animated mark — on the home hero, the mode screen's top-left
+    // logo, and the Add-to-Home-Screen prompt. All cycle the same pattern so
+    // they stay in step.
+    const markCells = ["hero-mark", "mode-mark", "a2hs-mark"]
       .map($)
       .filter(Boolean)
       .map((mark) => {
