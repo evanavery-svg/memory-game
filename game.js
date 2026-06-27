@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.9.3";
+  const VERSION = "1.10.0";
 
   /* ============================================================
      Elements
@@ -307,30 +307,36 @@
     if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
     return audioCtx;
   }
-  function tone(freq, dur, { type = "sine", gain = 0.06, slideTo = null } = {}) {
+  function tone(freq, dur, { type = "sine", gain = 0.06, slideTo = null, body = false } = {}) {
     if (!prefs.sound) return;
     const ctx = ac();
     if (!ctx) return;
-    const osc = ctx.createOscillator();
-    const g = ctx.createGain();
-    osc.type = type;
     const t0 = ctx.currentTime;
-    osc.frequency.setValueAtTime(freq, t0);
-    if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
-    g.gain.setValueAtTime(0, t0);
-    g.gain.linearRampToValueAtTime(gain, t0 + 0.008);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    osc.connect(g).connect(ctx.destination);
-    osc.start(t0);
-    osc.stop(t0 + dur + 0.02);
+    const voice = (f, g, ty, to) => {
+      const osc = ctx.createOscillator();
+      const gn = ctx.createGain();
+      osc.type = ty;
+      osc.frequency.setValueAtTime(f, t0);
+      if (to) osc.frequency.exponentialRampToValueAtTime(to, t0 + dur);
+      gn.gain.setValueAtTime(0, t0);
+      gn.gain.linearRampToValueAtTime(g, t0 + 0.008);
+      gn.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      osc.connect(gn).connect(ctx.destination);
+      osc.start(t0);
+      osc.stop(t0 + dur + 0.02);
+    };
+    voice(freq, gain, type, slideTo);
+    // A faint octave-below sine adds warm body so the beep feels designed, not
+    // thin — still one quiet sound, never a chord you'd notice.
+    if (body) voice(freq / 2, gain * 0.4, "sine", slideTo ? slideTo / 2 : null);
   }
   function vibrate(pattern) {
     if (prefs.haptics && navigator.vibrate) navigator.vibrate(pattern);
   }
   const sfx = {
-    flash: () => tone(523.25, 0.12, { gain: 0.05 }),
+    flash: () => tone(523.25, 0.12, { gain: 0.05, body: true }),
     correct: (n = 0) => {
-      tone(440 + n * 55, 0.14, { gain: 0.05 });
+      tone(440 + n * 55, 0.14, { gain: 0.05, body: true });
       vibrate(8);
     },
     wrong: () => {
@@ -338,9 +344,9 @@
       vibrate([18, 40, 18]);
     },
     win: () => {
-      tone(523.25, 0.12, { gain: 0.05 });
-      setTimeout(() => tone(659.25, 0.12, { gain: 0.05 }), 90);
-      setTimeout(() => tone(783.99, 0.18, { gain: 0.05 }), 180);
+      tone(523.25, 0.12, { gain: 0.05, body: true });
+      setTimeout(() => tone(659.25, 0.12, { gain: 0.05, body: true }), 90);
+      setTimeout(() => tone(783.99, 0.18, { gain: 0.05, body: true }), 180);
       vibrate(14);
     },
     over: () => {
@@ -349,16 +355,30 @@
     },
     tick: () => tone(880, 0.05, { gain: 0.04 }),
     unlock: () => {
-      tone(659.25, 0.1, { gain: 0.05 });
-      setTimeout(() => tone(987.77, 0.16, { gain: 0.05 }), 70);
+      tone(659.25, 0.1, { gain: 0.05, body: true });
+      setTimeout(() => tone(987.77, 0.16, { gain: 0.05, body: true }), 70);
     },
     checkpoint: () => {
-      tone(523.25, 0.1, { gain: 0.05 });
-      setTimeout(() => tone(784, 0.1, { gain: 0.05 }), 80);
-      setTimeout(() => tone(1046.5, 0.22, { gain: 0.05 }), 160);
+      tone(523.25, 0.1, { gain: 0.05, body: true });
+      setTimeout(() => tone(784, 0.1, { gain: 0.05, body: true }), 80);
+      setTimeout(() => tone(1046.5, 0.22, { gain: 0.05, body: true }), 160);
       vibrate([12, 40, 12]);
     },
-    power: () => tone(700, 0.12, { type: "triangle", gain: 0.05 }),
+    // A power-up lands: a soft two-note lift, a touch quieter than a clear.
+    earn: () => {
+      tone(784, 0.1, { gain: 0.045, body: true });
+      setTimeout(() => tone(1174.66, 0.16, { gain: 0.045, body: true }), 90);
+      vibrate([10, 30, 10]);
+    },
+    // A colorful board cleared: one brief high shimmer over the usual win.
+    milestone: () => {
+      tone(1318.51, 0.13, { gain: 0.03 });
+      setTimeout(() => tone(1567.98, 0.2, { gain: 0.03 }), 110);
+    },
+    // Peek re-reveals — a gentle upward "open".
+    peek: () => tone(587.33, 0.14, { type: "triangle", gain: 0.045, slideTo: 880 }),
+    // Skip sweeps the board clear — a quick downward whoosh before the win.
+    skip: () => tone(880, 0.16, { type: "triangle", gain: 0.045, slideTo: 440 }),
   };
 
   /* ============================================================
@@ -626,6 +646,8 @@
     boardEl.classList.remove("interactive");
     hidePowerups();
     sfx.win();
+    // A colorful board earns a brief shimmer on top of the win.
+    if (state.milestone) sfx.milestone();
 
     // A board only grows the combo if it was cleared cleanly and unaided.
     const perfect = state.roundMisses === 0 && !state.usedSkip && !state.usedPeek;
@@ -669,6 +691,8 @@
 
     if (granted) {
       promptEl.textContent = "Power-up earned";
+      // Let the win arpeggio breathe, then a soft pickup lift marks the reward.
+      setTimeout(() => { if (state.playing) sfx.earn(); }, 420);
     } else {
       promptEl.textContent =
         state.combo >= 2 ? `Perfect · ×${state.combo}` : "Perfect";
@@ -764,7 +788,7 @@
     state.peek--;
     state.usedPeek = true; // a peeked board doesn't grow the combo
     renderPowerups();
-    sfx.power();
+    sfx.peek();
     hidePowerups();
     const wasLocked = state.locked;
     state.locked = true;
@@ -805,7 +829,7 @@
     if (state.skip <= 0 || state.locked || !state.playing) return;
     state.skip--;
     state.usedSkip = true; // a skipped board doesn't grow the combo
-    sfx.power();
+    sfx.skip();
     hidePowerups();
     // Auto-complete the board.
     for (const i of state.target) {

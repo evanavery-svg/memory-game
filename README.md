@@ -57,7 +57,10 @@ No build step, no dependencies.
 - **Accessibility** — a high-contrast option, keyboard focus outlines, live
   status announcements for each round phase, and reduced-motion support.
 - **Sound & haptics** — generated WebAudio tones (no asset files) and vibration
-  on supported devices. Both can be muted.
+  on supported devices. The palette is deliberately minimal: short, quiet cues
+  with a faint warm body, plus distinct touches for earning a power-up, using
+  Peek vs. Skip, and clearing a colorful board. Both sound and haptics can be
+  muted.
 - **Stats & history** — games played, tap accuracy, best level, best combo, a
   sparkline of recent scores, and per-mode bests. Saved locally.
 - **Back up & restore** — export your progress to a JSON file and import it on
