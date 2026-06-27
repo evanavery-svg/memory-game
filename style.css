@@ -692,10 +692,9 @@ body {
   position: absolute;
   top: max(13px, env(safe-area-inset-top));
   left: 18px;
-  right: 18px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 10px;
   z-index: 22;
   transition: opacity 0.8s var(--ease);
 }
