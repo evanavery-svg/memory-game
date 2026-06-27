@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.10.1";
+  const VERSION = "1.10.2";
 
   /* ============================================================
      Elements
@@ -19,6 +19,7 @@
   const comboX = $("combo-x");
   const backBtn = $("back-btn");
   const wordmark = $("wordmark");
+  const dailyDateEl = $("daily-date");
   const themeColorMeta = $("theme-color");
   const powerupsEl = $("powerups");
   const peekBtn = $("power-peek");
@@ -180,6 +181,18 @@
     return `${y}-${m}-${day}`;
   }
   const todayKey = () => dateKey(new Date());
+  // A human-friendly date for the Daily masthead, e.g. "June 27, 2026".
+  function dailyDateLabel() {
+    try {
+      return new Date().toLocaleDateString(undefined, {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      });
+    } catch {
+      return todayKey();
+    }
+  }
   // Daily is one-and-done per local calendar day; it unlocks again at midnight
   // because todayKey() rolls over to a new date.
   const dailyDoneToday = () => stats.dailyDone === todayKey();
@@ -953,6 +966,13 @@
     comboEl.classList.remove("show");
     backBtn.hidden = false;
     wordmark.hidden = false;
+    // Daily shows today's date under the wordmark; other modes don't.
+    if (state.mode === "daily") {
+      dailyDateEl.textContent = dailyDateLabel();
+      dailyDateEl.hidden = false;
+    } else {
+      dailyDateEl.hidden = true;
+    }
     powerupsEl.classList.remove("show", "reserved");
     checkpointEl.hidden = true;
     renderHUD();
@@ -1082,6 +1102,7 @@
     powerupsEl.classList.remove("show", "reserved");
     backBtn.hidden = true;
     wordmark.hidden = true;
+    dailyDateEl.hidden = true;
     // Reset the mode screen's quote/transition state for a clean next entry.
     screens.modes.classList.remove("quoting");
     const mq = $("modes-quote");

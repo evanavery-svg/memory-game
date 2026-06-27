@@ -28,7 +28,8 @@ No build step, no dependencies.
   - **Daily** — a deterministic seed gives everyone the same boards each day,
     with a spoiler-free, Wordle-style result you can copy and share. One run per
     day — it locks the moment you start (no retries) and resets at midnight local
-    time. The ramp turns brutal from level 15 on.
+    time. The ramp turns brutal from level 15 on. Today's date sits as a quiet
+    caption under the wordmark while you play.
   - **Order** — tiles flash one at a time; tap them back in the same sequence.
 - **Adaptive difficulty** — flash time self-calibrates to your skill as you play
   (off in Daily, and can be disabled in Settings).

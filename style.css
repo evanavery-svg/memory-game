@@ -105,6 +105,18 @@ body {
   letter-spacing: -0.02em;
 }
 
+/* Daily masthead date — a quiet, evenly-spaced caption under the wordmark. */
+.daily-date {
+  margin: 6px 0 2px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
 .icon-btn {
   appearance: none;
   border: none;
