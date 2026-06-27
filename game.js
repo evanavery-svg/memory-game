@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.10.2";
+  const VERSION = "1.10.3";
 
   /* ============================================================
      Elements
@@ -1708,7 +1708,7 @@
     { t: "We are our memory, we are that chimerical museum of shifting shapes.", by: "Jorge Luis Borges" },
     { t: "Memory is the diary we all carry about with us.", by: "Oscar Wilde" },
     { t: "A mind that is stretched by a new experience can never go back to its old dimensions.", by: "Oliver Wendell Holmes" },
-    { t: "The palest ink is better than the best memory — so train the best memory.", by: "Proverb, adapted" },
+    { t: "What we learn with pleasure we never forget.", by: "Alfred Mercier" },
     { t: "Practice does not make perfect. Perfect practice makes perfect.", by: "Vince Lombardi" },
     { t: "The things we remember best are the things best forgotten.", by: "Baltasar Gracián" },
     { t: "Attention is the rarest and purest form of generosity.", by: "Simone Weil" },
