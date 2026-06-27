@@ -8,8 +8,9 @@ generous whitespace, soft spring motion. Works great on desktop too.
 
 The landing screen is deliberately spare — just the mark, the name, and a
 single **Play** button. Tapping it cross-fades to a quiet memory quote, held
-for three seconds; the quote then drops to the foot of the screen as the mode
-bar (and Stats, Settings, How to play) and a small top-left mark fade in.
+for three seconds; the quote then floats gently down to rest near the foot of
+the screen as the mode bar (and Stats, Settings, How to play) and the top-left
+**Recall** wordmark + animated mark fade in.
 
 ## Play
 

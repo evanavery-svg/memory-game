@@ -687,23 +687,34 @@ body {
   color: var(--muted);
 }
 
-/* ---------- Mode screen: top-left animated mark ---------- */
-.mode-mark {
+/* ---------- Mode screen: top-left brand (wordmark + animated mark) ---------- */
+.mode-brand {
   position: absolute;
-  top: max(14px, env(safe-area-inset-top));
+  top: max(13px, env(safe-area-inset-top));
   left: 18px;
-  width: 40px;
-  height: 40px;
-  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 22;
+  transition: opacity 0.8s var(--ease);
+}
+.mode-brand-name {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.mode-mark {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
   background: var(--ink);
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   grid-template-rows: repeat(3, 1fr);
   gap: 3px;
-  padding: 8px;
+  padding: 7px;
   box-shadow: 0 6px 16px var(--shadow);
-  z-index: 22;
-  transition: opacity 0.5s var(--ease);
 }
 .mode-mark i {
   border-radius: 2px;
@@ -713,30 +724,35 @@ body {
   background: var(--bg);
 }
 
-/* ---------- Mode screen: the quote that drops in from centre ---------- */
+/* ---------- Mode screen: the quote that floats down from centre ---------- */
 .modes-quote {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: max(28px, calc(env(safe-area-inset-bottom) + 14px));
+  bottom: max(64px, calc(env(safe-area-inset-bottom) + 48px));
   margin: 0 auto;
   max-width: 320px;
   min-height: 0;
   padding: 0 18px;
   will-change: transform;
-  transition: opacity 0.5s var(--ease);
+  transition: opacity 0.6s var(--ease);
 }
 .modes-quote blockquote {
   font-size: 16px;
   line-height: 1.5;
 }
 
-/* Quote-only phase: hide the bar + mark, let the quote stand alone. */
+/* The mode bar eases in a touch slower, to match the quote's unhurried float. */
+.modes-screen:not(.quoting) .modes-inner {
+  animation: screenIn 0.75s var(--ease);
+}
+
+/* Quote-only phase: hide the bar + brand, let the quote stand alone. */
 .modes-screen.quoting .modes-inner {
   animation: none;
   opacity: 0;
 }
-.modes-screen.quoting .mode-mark {
+.modes-screen.quoting .mode-brand {
   opacity: 0;
 }
 

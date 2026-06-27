@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.9.1";
+  const VERSION = "1.9.2";
 
   /* ============================================================
      Elements
@@ -1656,7 +1656,7 @@
     const r = quote.getBoundingClientRect();
     const delta = window.innerHeight / 2 - (r.top + r.height / 2);
     quote.dataset.delta = String(delta);
-    quote.style.transform = `translateY(${delta}px) scale(1.08)`;
+    quote.style.transform = `translateY(${delta}px) scale(1.05)`;
   }
 
   // Play on the landing screen → cross-fade to a single centred quote, hold it
@@ -1694,15 +1694,17 @@
     screen.classList.remove("quoting"); // mode bar + mark fade/slide in
     syncHomeHints();
 
-    // Drop the quote down to where it rests at the bottom of the screen.
+    // Let the quote float down to its resting place — slow, even, weightless,
+    // with a long soft landing. A gentle curve (low initial velocity, no fast
+    // drop, a lingering decelerating tail) keeps it classy rather than abrupt.
     quote.style.transform = "translateY(0) scale(1)";
     if (!prefersReducedMotion()) {
       quote.animate(
         [
-          { transform: `translateY(${delta}px) scale(1.08)` },
+          { transform: `translateY(${delta}px) scale(1.05)` },
           { transform: "translateY(0) scale(1)" },
         ],
-        { duration: 680, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }
+        { duration: 2100, easing: "cubic-bezier(0.37, 0, 0.63, 1)" }
       );
     }
   }

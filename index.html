@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/icon-180.png" />
   <link rel="icon" href="icons/icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=1.9.1" />
+  <link rel="stylesheet" href="style.css?v=1.9.2" />
   <title>Recall</title>
 </head>
 <body>
@@ -92,7 +92,10 @@
 
     <!-- ===== Mode-select screen ===== -->
     <section class="screen modes-screen" id="modes-screen" hidden>
-      <div class="mode-mark" id="mode-mark" aria-hidden="true"></div>
+      <div class="mode-brand" aria-hidden="true">
+        <span class="mode-brand-name">Recall</span>
+        <span class="mode-mark" id="mode-mark"></span>
+      </div>
       <div class="screen-inner modes-inner">
         <div class="field">
           <label class="field-label">Mode</label>
@@ -301,6 +304,6 @@
     <canvas id="share-canvas" width="1080" height="1350" hidden></canvas>
   </main>
 
-  <script src="game.js?v=1.9.1"></script>
+  <script src="game.js?v=1.9.2"></script>
 </body>
 </html>
