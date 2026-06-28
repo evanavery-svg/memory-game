@@ -22,8 +22,10 @@ No build step, no dependencies.
 
 ## Features
 
-- **Four modes**
+- **Five modes**
   - **Endless** — clear boards as far as you can.
+  - **Expert** — for veterans: skips the gentle early boards and drops you in at
+    level 8, with its own best score.
   - **Sprint** — most points in 60 seconds; a miss costs time instead of a life.
   - **Daily** — a deterministic seed gives everyone the same boards each day,
     with a spoiler-free, Wordle-style result you can copy and share. One run per
@@ -44,9 +46,11 @@ No build step, no dependencies.
   palette: tiles flash in color and a correct tap pops with a small ring.
   Everything else stays strictly monochrome.
 - **Daily streaks** — playing on consecutive days builds a streak, with a
-  contribution-style calendar of prior days and your longest run.
+  contribution-style calendar of prior days and your longest run, plus a
+  **this-week strip** of your Daily scores with the best day highlighted.
 - **Achievements** — nine unlockable badges (combos, levels, streaks, a clean
-  Sprint…) with a toast when you earn one.
+  Sprint…) with a toast when you earn one. Locked badges show a progress bar and
+  how close you are to earning them.
 - **Gradual difficulty** — the grid grows from 3×3 toward 6×6 and lit tiles climb
   slowly. Flash time scales with how many tiles you must memorize, so harder
   boards get a longer look. Three presets:
@@ -62,8 +66,13 @@ No build step, no dependencies.
   with a faint warm body, plus distinct touches for earning a power-up, using
   Peek vs. Skip, and clearing a colorful board. Both sound and haptics can be
   muted.
-- **Stats & history** — games played, tap accuracy, best level, best combo, a
-  sparkline of recent scores, and per-mode bests. Saved locally.
+- **Stats & history** — games played, tap accuracy, best level, best combo,
+  sparklines of recent scores and your accuracy trend, a "when you play"
+  time-of-day chart, and per-mode bests with the average level you reach in each.
+  Saved locally.
+- **Personal-best deltas** — the end screen tells you how a run stacks up against
+  your best for that mode: "+N over your best" when you beat it, or how far you
+  fell short.
 - **Back up & restore** — export your progress to a JSON file and import it on
   another device.
 - **Shareable result card** — a generated black-and-white image of your score

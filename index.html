@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/icon-180.png" />
   <link rel="icon" href="icons/icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=1.10.4" />
+  <link rel="stylesheet" href="style.css?v=1.11.0" />
   <title>Recall</title>
 </head>
 <body>
@@ -102,9 +102,10 @@
       <div class="screen-inner modes-inner">
         <div class="field">
           <label class="field-label">Mode</label>
-          <div class="segmented mode-seg" id="mode-seg" data-store="mode" style="--count:4;--idx:0;" role="tablist">
+          <div class="segmented mode-seg" id="mode-seg" data-store="mode" style="--count:5;--idx:0;" role="tablist">
             <span class="thumb"></span>
             <button class="seg is-active" data-value="endless" role="tab">Endless</button>
+            <button class="seg" data-value="expert" role="tab">Expert</button>
             <button class="seg" data-value="sprint" role="tab">Sprint</button>
             <button class="seg" data-value="daily" role="tab">Daily</button>
             <button class="seg" data-value="sequence" role="tab">Order</button>
@@ -198,6 +199,12 @@
           <div class="calendar" id="calendar" aria-label="Days played"></div>
         </div>
 
+        <!-- Daily scores this week -->
+        <div class="week-wrap">
+          <div class="spark-head"><span>Daily this week</span><span id="week-total"></span></div>
+          <div class="week-strip" id="week-strip" aria-label="Daily scores this week"></div>
+        </div>
+
         <div class="stat-grid">
           <div class="stat-card"><span class="big" id="s-games">0</span><span class="cap">Games</span></div>
           <div class="stat-card"><span class="big" id="s-acc">—</span><span class="cap">Accuracy</span></div>
@@ -216,12 +223,17 @@
           <svg class="spark" id="spark" viewBox="0 0 300 80" preserveAspectRatio="none" aria-hidden="true"></svg>
         </div>
 
-        <ul class="best-list">
-          <li><span>Endless best</span><b id="best-endless">0</b></li>
-          <li><span>Sprint best</span><b id="best-sprint">0</b></li>
-          <li><span>Daily best</span><b id="best-daily">0</b></li>
-          <li><span>Order best</span><b id="best-sequence">0</b></li>
-        </ul>
+        <div class="spark-wrap">
+          <div class="spark-head"><span>Accuracy trend</span><span id="acc-last"></span></div>
+          <svg class="spark" id="acc-spark" viewBox="0 0 300 80" preserveAspectRatio="none" aria-hidden="true"></svg>
+        </div>
+
+        <div class="hours-wrap">
+          <div class="spark-head"><span>When you play</span><span id="hours-peak"></span></div>
+          <svg class="hours" id="hours" viewBox="0 0 300 70" preserveAspectRatio="none" aria-hidden="true"></svg>
+        </div>
+
+        <ul class="best-list" id="best-list"></ul>
 
         <button class="link-btn danger" id="reset-stats">Reset stats</button>
         <button class="cta ghost" data-close>Done</button>
@@ -242,8 +254,10 @@
         </ol>
         <p class="help-modes">
           <b>Endless</b> — go as far as you can.<br />
+          <b>Expert</b> — skip the grind; start deep at level 8.<br />
           <b>Sprint</b> — most points in 60 seconds; misses cost time.<br />
-          <b>Daily</b> — everyone gets the same boards each day.
+          <b>Daily</b> — everyone gets the same boards each day.<br />
+          <b>Order</b> — tiles flash one at a time; tap them back in order.
         </p>
         <button class="cta ghost" data-close>Got it</button>
       </div>
@@ -295,6 +309,7 @@
         <h2 class="end-score" id="end-score">0</h2>
         <p class="end-detail" id="end-detail">Level 1</p>
         <p class="end-best" id="end-best" hidden>New personal best</p>
+        <p class="end-gap" id="end-gap" hidden></p>
         <div class="end-actions">
           <button class="cta" id="again-btn">Play again</button>
           <button class="link-btn" id="share-btn">Share result</button>
@@ -308,6 +323,6 @@
     <canvas id="share-canvas" width="1080" height="1350" hidden></canvas>
   </main>
 
-  <script src="game.js?v=1.10.4"></script>
+  <script src="game.js?v=1.11.0"></script>
 </body>
 </html>

@@ -868,6 +868,96 @@ body {
 }
 .best-list span {
   color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.best-sub {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  opacity: 0.75;
+}
+
+/* ---------- Daily this week ---------- */
+.week-wrap {
+  margin-bottom: 22px;
+}
+.week-strip {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+.week-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 2px 8px;
+  border-radius: 12px;
+  background: var(--tile);
+  border: 1px solid var(--tile-edge);
+}
+.week-val {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.week-dow {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.week-cell.empty .week-val {
+  color: var(--muted);
+  opacity: 0.5;
+}
+.week-cell.future {
+  opacity: 0.4;
+}
+.week-cell.today {
+  border-color: var(--ink);
+}
+.week-cell.top {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+.week-cell.top .week-val {
+  color: var(--bg);
+}
+.week-cell.top .week-dow {
+  color: var(--bg);
+  opacity: 0.7;
+}
+
+/* ---------- When you play ---------- */
+.hours-wrap {
+  margin-bottom: 22px;
+}
+.hours {
+  width: 100%;
+  height: 70px;
+  display: block;
+  overflow: visible;
+}
+.hour-bar {
+  fill: var(--tile-edge);
+}
+.hour-bar.peak {
+  fill: var(--ink);
+}
+.hours .hour-tick {
+  fill: var(--muted);
+  font-size: 9px;
+  font-weight: 600;
+}
+.hours .empty {
+  fill: var(--muted);
+  font-size: 13px;
 }
 
 /* ---------- Help ---------- */
@@ -927,6 +1017,16 @@ body {
   padding: 7px 0;
 }
 .end-best[hidden] {
+  display: none;
+}
+.end-gap {
+  text-align: center;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--muted);
+  margin: 12px 0 0;
+}
+.end-gap[hidden] {
   display: none;
 }
 .end-actions {
@@ -1252,14 +1352,36 @@ body {
   letter-spacing: -0.01em;
   line-height: 1.2;
 }
+/* Progress toward a locked achievement: a thin bar + current / goal. */
+.ach-prog {
+  width: 100%;
+  height: 4px;
+  margin-top: 2px;
+  border-radius: 999px;
+  background: var(--tile-edge);
+  overflow: hidden;
+}
+.ach-prog-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--muted);
+}
+.ach-prog-num {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
 
-/* ---------- 4-up mode selector ---------- */
-/* The mode segmented control holds four options — tighten the type so labels
-   ("Endless", "Sprint", "Daily", "Order") fit on narrow phones. */
+/* ---------- 5-up mode selector ---------- */
+/* The mode segmented control holds five options — tighten the type so labels
+   ("Endless", "Expert", "Sprint", "Daily", "Order") fit on narrow phones. */
 .segmented.mode-seg .seg {
-  font-size: 13.5px;
-  padding: 11px 2px;
-  letter-spacing: -0.02em;
+  font-size: 12.5px;
+  padding: 11px 1px;
+  letter-spacing: -0.03em;
 }
 
 /* ---------- Tutorial ---------- */

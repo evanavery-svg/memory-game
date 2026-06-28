@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.10.4";
+  const VERSION = "1.11.0";
 
   /* ============================================================
      Elements
@@ -65,8 +65,12 @@
       correctTaps: 0,
       bestLevel: 0,
       bestCombo: 0,
-      best: { endless: 0, sprint: 0, daily: 0, sequence: 0 },
+      best: { endless: 0, expert: 0, sprint: 0, daily: 0, sequence: 0 },
       recent: [],
+      recentAcc: [], // last games' tap accuracy (%) — for the trend sparkline
+      playHours: [], // 24 counts, one per hour-of-day a game ended
+      modeAgg: {}, // per-mode { runs, levelSum } for average-level stats
+      dailyScores: {}, // { "YYYY-MM-DD": score } for the Daily weekly strip
       streak: { current: 0, longest: 0, last: null },
       playDays: [], // ["YYYY-MM-DD", ...]
       achievements: [], // unlocked ids
@@ -77,9 +81,15 @@
   );
   // Backfill nested defaults for older saves.
   stats.streak = Object.assign({ current: 0, longest: 0, last: null }, stats.streak);
-  stats.best = Object.assign({ endless: 0, sprint: 0, daily: 0, sequence: 0 }, stats.best);
+  stats.best = Object.assign({ endless: 0, expert: 0, sprint: 0, daily: 0, sequence: 0 }, stats.best);
   if (!Array.isArray(stats.playDays)) stats.playDays = [];
   if (!Array.isArray(stats.achievements)) stats.achievements = [];
+  if (!Array.isArray(stats.recentAcc)) stats.recentAcc = [];
+  if (!Array.isArray(stats.playHours) || stats.playHours.length !== 24)
+    stats.playHours = Array(24).fill(0);
+  if (!stats.modeAgg || typeof stats.modeAgg !== "object") stats.modeAgg = {};
+  if (!stats.dailyScores || typeof stats.dailyScores !== "object")
+    stats.dailyScores = {};
   if (typeof stats.calib !== "number") stats.calib = 0;
 
   function readJSON(key, fallback) {
@@ -101,6 +111,12 @@
      ============================================================ */
   const MODES = {
     endless: { label: "Level", timed: false, hint: "Clear boards forever. Three lives." },
+    expert: {
+      label: "Level",
+      timed: false,
+      headStart: 8,
+      hint: "For veterans — skip the grind, start at level 8.",
+    },
     sprint: {
       label: "Time",
       timed: true,
@@ -122,6 +138,17 @@
     standard: { lives: 3, flashBonus: 0, scale: 1, hint: "Balanced flash time. Three lives." },
     hard: { lives: 2, flashBonus: -260, scale: 1.3, hint: "Quick flash. Two lives." },
   };
+
+  // Friendly display name for a mode key (Order is stored as "sequence").
+  const MODE_NAMES = {
+    endless: "Endless",
+    expert: "Expert",
+    sprint: "Sprint",
+    daily: "Daily",
+    sequence: "Order",
+  };
+  const modeLabel = (m) =>
+    MODE_NAMES[m] || (m ? m[0].toUpperCase() + m.slice(1) : "");
 
   /* ============================================================
      State
@@ -242,29 +269,36 @@
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 12c0-2-1.5-3.5-3-3.5S2 10 2 12s1.5 3.5 3 3.5 3-1.5 4-3.5 2.5-3.5 4-3.5 3 1.5 3 3.5-1.5 3.5-3 3.5-3-1.5-4-3.5"/></svg>',
   };
 
+  // Each achievement carries a goal and a `prog(ctx)` reading so the Stats
+  // screen can show how close you are to the locked ones. `test` stays the
+  // source of truth for unlocking.
   const ACHIEVEMENTS = [
-    { id: "first", name: "First Steps", icon: "flag", test: (c) => c.gamesPlayed >= 1 },
-    { id: "combo5", name: "Sharp", icon: "bolt", test: (c) => c.bestCombo >= 5 },
-    { id: "combo9", name: "Flawless", icon: "star", test: (c) => c.bestCombo >= 9 },
-    { id: "level10", name: "Double Digits", icon: "medal", test: (c) => c.bestLevel >= 10 },
-    { id: "level15", name: "Mastermind", icon: "crown", test: (c) => c.bestLevel >= 15 },
-    { id: "sprintClean", name: "Marksman", icon: "target", test: (c) => c.cleanSprint },
-    { id: "score500", name: "High Roller", icon: "trophy", test: (c) => c.bestSingle >= 500 },
-    { id: "streak7", name: "Dedicated", icon: "flame", test: (c) => c.streak.longest >= 7 },
-    { id: "games25", name: "Persistent", icon: "infinity", test: (c) => c.gamesPlayed >= 25 },
+    { id: "first", name: "First Steps", icon: "flag", goal: 1, unit: "game", prog: (c) => c.gamesPlayed, test: (c) => c.gamesPlayed >= 1 },
+    { id: "combo5", name: "Sharp", icon: "bolt", goal: 5, unit: "×combo", prog: (c) => c.bestCombo, test: (c) => c.bestCombo >= 5 },
+    { id: "combo9", name: "Flawless", icon: "star", goal: 9, unit: "×combo", prog: (c) => c.bestCombo, test: (c) => c.bestCombo >= 9 },
+    { id: "level10", name: "Double Digits", icon: "medal", goal: 10, unit: "level", prog: (c) => c.bestLevel, test: (c) => c.bestLevel >= 10 },
+    { id: "level15", name: "Mastermind", icon: "crown", goal: 15, unit: "level", prog: (c) => c.bestLevel, test: (c) => c.bestLevel >= 15 },
+    { id: "sprintClean", name: "Marksman", icon: "target", goal: 1, unit: "", prog: (c) => (c.cleanSprint ? 1 : 0), test: (c) => c.cleanSprint },
+    { id: "score500", name: "High Roller", icon: "trophy", goal: 500, unit: "pts", prog: (c) => c.bestSingle, test: (c) => c.bestSingle >= 500 },
+    { id: "streak7", name: "Dedicated", icon: "flame", goal: 7, unit: "days", prog: (c) => c.streak.longest, test: (c) => c.streak.longest >= 7 },
+    { id: "games25", name: "Persistent", icon: "infinity", goal: 25, unit: "games", prog: (c) => c.gamesPlayed, test: (c) => c.gamesPlayed >= 25 },
   ];
 
+  // The same context object checkAchievements builds — reused by the Stats
+  // screen to compute live progress toward locked badges.
+  function achContext() {
+    return {
+      gamesPlayed: stats.gamesPlayed,
+      bestCombo: stats.bestCombo,
+      bestLevel: stats.bestLevel,
+      streak: stats.streak,
+      bestSingle: Math.max(0, ...stats.recent, ...Object.values(stats.best)),
+      cleanSprint: false,
+    };
+  }
+
   function checkAchievements(extra = {}) {
-    const ctx = Object.assign(
-      {
-        gamesPlayed: stats.gamesPlayed,
-        bestCombo: stats.bestCombo,
-        bestLevel: stats.bestLevel,
-        streak: stats.streak,
-        bestSingle: Math.max(0, ...stats.recent, ...Object.values(stats.best)),
-      },
-      extra
-    );
+    const ctx = Object.assign(achContext(), extra);
     let changed = false;
     for (const a of ACHIEVEMENTS) {
       if (stats.achievements.includes(a.id)) continue;
@@ -936,7 +970,8 @@
     }
     state.mode = prefs.mode;
     state.diff = prefs.difficulty;
-    state.level = 1;
+    // Expert skips the gentle early boards and drops you in deep.
+    state.level = MODES[state.mode].headStart || 1;
     state.score = 0;
     state.combo = 1;
     state.bestCombo = 1;
@@ -1007,10 +1042,30 @@
     stats.correctTaps += state.hits;
     stats.bestLevel = Math.max(stats.bestLevel, reachedLevel);
     stats.bestCombo = Math.max(stats.bestCombo, state.bestCombo);
-    const isBest = state.score >= (stats.best[state.mode] || 0);
-    stats.best[state.mode] = Math.max(stats.best[state.mode] || 0, state.score);
+    const prevBest = stats.best[state.mode] || 0; // best before this run
+    const isBest = state.score >= prevBest;
+    stats.best[state.mode] = Math.max(prevBest, state.score);
     stats.recent.push(state.score);
     if (stats.recent.length > 16) stats.recent = stats.recent.slice(-16);
+
+    // Per-game accuracy, for the trend sparkline.
+    const acc = state.taps > 0 ? Math.round((state.hits / state.taps) * 100) : 0;
+    stats.recentAcc.push(acc);
+    if (stats.recentAcc.length > 16) stats.recentAcc = stats.recentAcc.slice(-16);
+
+    // When you play, for the time-of-day distribution.
+    stats.playHours[new Date().getHours()] += 1;
+
+    // Per-mode run aggregate, for average level reached.
+    const agg = (stats.modeAgg[state.mode] = stats.modeAgg[state.mode] || {
+      runs: 0,
+      levelSum: 0,
+    });
+    agg.runs += 1;
+    agg.levelSum += reachedLevel;
+
+    // Daily keeps a per-day score for the weekly strip.
+    if (state.mode === "daily") stats.dailyScores[todayKey()] = state.score;
 
     // A clean Sprint = at least one tap and zero wrong taps.
     const cleanSprint =
@@ -1024,6 +1079,7 @@
       mode: state.mode,
       combo: state.bestCombo,
       isBest: isBest && state.score > 0,
+      prevBest,
     };
 
     setTimeout(() => showEndScreen(state.lastResult), 900);
@@ -1126,7 +1182,32 @@
         : `Reached level ${r.level}`;
     $("end-detail").textContent =
       detail + (r.combo >= 2 ? ` · best ×${r.combo}` : "");
-    $("end-best").hidden = !r.isBest;
+
+    // Relationship to your personal best for this mode.
+    const name = modeLabel(r.mode);
+    const eb = $("end-best");
+    const eg = $("end-gap");
+    const beat = r.prevBest > 0 && r.score > r.prevBest;
+    if (beat) {
+      eb.textContent = `New ${name} best · +${r.score - r.prevBest}`;
+      eb.hidden = false;
+      eg.hidden = true;
+    } else if (r.prevBest === 0 && r.score > 0) {
+      eb.textContent = `Your first ${name} score`;
+      eb.hidden = false;
+      eg.hidden = true;
+    } else {
+      eb.hidden = true;
+      if (r.prevBest > 0) {
+        const gap = r.prevBest - r.score;
+        eg.textContent =
+          gap > 0 ? `${gap} from your ${name} best` : `Matched your ${name} best`;
+        eg.hidden = false;
+      } else {
+        eg.hidden = true;
+      }
+    }
+
     $("copy-result").hidden = r.mode !== "daily";
     // Daily can't be replayed today, so the primary action returns home.
     $("again-btn").textContent = r.mode === "daily" ? "Back to home" : "Play again";
@@ -1160,10 +1241,6 @@
     $("s-acc").textContent = acc;
     $("s-level").textContent = stats.bestLevel;
     $("s-streak").textContent = stats.bestCombo >= 1 ? stats.bestCombo : 0;
-    $("best-endless").textContent = stats.best.endless || 0;
-    $("best-sprint").textContent = stats.best.sprint || 0;
-    $("best-daily").textContent = stats.best.daily || 0;
-    $("best-sequence").textContent = stats.best.sequence || 0;
     // A streak counts as current only if you played today or yesterday.
     const last = stats.streak.last;
     const live =
@@ -1171,8 +1248,69 @@
     $("streak-current").textContent = live;
     $("streak-longest").textContent = stats.streak.longest;
     renderCalendar();
+    renderDailyWeek();
     renderAchievements();
     renderSpark();
+    renderAccSpark();
+    renderHours();
+    renderBestList();
+  }
+
+  // Per-mode bests with average level reached underneath each.
+  function renderBestList() {
+    const list = $("best-list");
+    if (!list) return;
+    const rows = ["endless", "expert", "sprint", "daily", "sequence"];
+    list.innerHTML = rows
+      .map((key) => {
+        const best = stats.best[key] || 0;
+        const agg = stats.modeAgg[key] || { runs: 0, levelSum: 0 };
+        const avg = agg.runs ? Math.round(agg.levelSum / agg.runs) : 0;
+        const sub = agg.runs
+          ? `<small class="best-sub">avg level ${avg}</small>`
+          : "";
+        return `<li><span>${modeLabel(key)} best${sub}</span><b>${best}</b></li>`;
+      })
+      .join("");
+  }
+
+  // The current week's Daily scores, Sun–Sat, with the best day highlighted.
+  function renderDailyWeek() {
+    const strip = $("week-strip");
+    if (!strip) return;
+    const today = new Date();
+    const sunday = new Date(today);
+    sunday.setDate(today.getDate() - today.getDay()); // back to Sunday
+    const labels = ["S", "M", "T", "W", "T", "F", "S"];
+    const todayStr = todayKey();
+    let total = 0;
+    let topScore = -1;
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(sunday);
+      d.setDate(sunday.getDate() + i);
+      const key = dateKey(d);
+      const has = Object.prototype.hasOwnProperty.call(stats.dailyScores, key);
+      const score = has ? stats.dailyScores[key] : null;
+      if (has) total += score;
+      if (has && score > topScore) topScore = score;
+      days.push({ key, score, has, future: d > today, isToday: key === todayStr, dow: d.getDay() });
+    }
+    strip.innerHTML = days
+      .map((d) => {
+        let cls = "week-cell";
+        if (d.future) cls += " future";
+        else if (!d.has) cls += " empty";
+        if (d.isToday) cls += " today";
+        if (d.has && d.score === topScore && topScore > 0) cls += " top";
+        const val = d.future ? "" : d.has ? d.score : "—";
+        return (
+          `<div class="${cls}"><span class="week-val">${val}</span>` +
+          `<span class="week-dow">${labels[d.dow]}</span></div>`
+        );
+      })
+      .join("");
+    $("week-total").textContent = total > 0 ? `${total} total` : "";
   }
 
   function renderCalendar() {
@@ -1211,29 +1349,40 @@
     const grid = $("ach-grid");
     grid.innerHTML = "";
     const unlocked = new Set(stats.achievements);
+    const ctx = achContext();
     for (const a of ACHIEVEMENTS) {
       const has = unlocked.has(a.id);
       const el = document.createElement("div");
       el.className = "ach" + (has ? "" : " locked");
-      el.innerHTML =
+      let inner =
         `<span class="ach-badge">${ICONS[a.icon]}</span>` +
-        `<span class="ach-name">${has ? a.name : "Locked"}</span>`;
+        `<span class="ach-name">${a.name}</span>`;
+      if (!has) {
+        // Show how close you are: a thin bar plus current / goal.
+        const cur = Math.max(0, Math.min(a.goal, a.prog(ctx)));
+        const pct = Math.round((cur / a.goal) * 100);
+        const label = a.goal > 1 ? `${cur}/${a.goal}` : "Locked";
+        inner +=
+          `<span class="ach-prog"><span class="ach-prog-fill" style="width:${pct}%"></span></span>` +
+          `<span class="ach-prog-num">${label}</span>`;
+      }
+      el.innerHTML = inner;
       el.title = a.name;
       grid.appendChild(el);
     }
     $("ach-count").textContent = `${unlocked.size} / ${ACHIEVEMENTS.length}`;
   }
-  function renderSpark() {
-    const svg = $("spark");
-    const data = stats.recent.slice(-12);
+  const SVGNS = "http://www.w3.org/2000/svg";
+  // Shared line-sparkline: auto-scales `data` to fill the 300×80 viewBox.
+  function drawSpark(svg, data, emptyMsg) {
     svg.innerHTML = "";
     if (data.length < 2) {
-      const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      const t = document.createElementNS(SVGNS, "text");
       t.setAttribute("x", "150");
       t.setAttribute("y", "44");
       t.setAttribute("text-anchor", "middle");
       t.setAttribute("class", "empty");
-      t.textContent = "Play a few games to see your trend";
+      t.textContent = emptyMsg;
       svg.appendChild(t);
       return;
     }
@@ -1248,21 +1397,75 @@
       const y = H - pad - ((v - min) / span) * (H - pad * 2);
       return [x, y];
     });
-    const poly = document.createElementNS(
-      "http://www.w3.org/2000/svg",
-      "polyline"
-    );
+    const poly = document.createElementNS(SVGNS, "polyline");
     poly.setAttribute("points", pts.map((p) => p.join(",")).join(" "));
     svg.appendChild(poly);
     const last = pts[pts.length - 1];
-    const dot = document.createElementNS(
-      "http://www.w3.org/2000/svg",
-      "circle"
-    );
+    const dot = document.createElementNS(SVGNS, "circle");
     dot.setAttribute("cx", last[0]);
     dot.setAttribute("cy", last[1]);
     dot.setAttribute("r", "3.5");
     svg.appendChild(dot);
+  }
+  function renderSpark() {
+    drawSpark($("spark"), stats.recent.slice(-12), "Play a few games to see your trend");
+  }
+  function renderAccSpark() {
+    const data = stats.recentAcc.slice(-12);
+    drawSpark($("acc-spark"), data, "Accuracy shows after a couple of games");
+    $("acc-last").textContent = data.length ? `${data[data.length - 1]}%` : "";
+  }
+
+  // A 24-bar distribution of when you finish games, by hour of day.
+  function renderHours() {
+    const svg = $("hours");
+    svg.innerHTML = "";
+    const data = stats.playHours;
+    const total = data.reduce((a, b) => a + b, 0);
+    if (total === 0) {
+      const t = document.createElementNS(SVGNS, "text");
+      t.setAttribute("x", "150");
+      t.setAttribute("y", "40");
+      t.setAttribute("text-anchor", "middle");
+      t.setAttribute("class", "empty");
+      t.textContent = "Your play times appear here";
+      svg.appendChild(t);
+      $("hours-peak").textContent = "";
+      return;
+    }
+    const W = 300,
+      H = 70,
+      pad = 6,
+      n = 24;
+    const max = Math.max(...data);
+    const slot = (W - pad * 2) / n;
+    const bw = slot * 0.62;
+    for (let h = 0; h < n; h++) {
+      const bh = data[h] > 0 ? Math.max(3, (data[h] / max) * (H - pad * 2 - 10)) : 1;
+      const x = pad + h * slot + (slot - bw) / 2;
+      const y = H - pad - 10 - bh;
+      const rect = document.createElementNS(SVGNS, "rect");
+      rect.setAttribute("x", x.toFixed(1));
+      rect.setAttribute("y", y.toFixed(1));
+      rect.setAttribute("width", bw.toFixed(1));
+      rect.setAttribute("height", bh.toFixed(1));
+      rect.setAttribute("rx", "1.5");
+      rect.setAttribute("class", data[h] === max ? "hour-bar peak" : "hour-bar");
+      svg.appendChild(rect);
+    }
+    // Axis ticks at 0 / 6 / 12 / 18 so the day reads left→right.
+    [0, 6, 12, 18].forEach((h) => {
+      const t = document.createElementNS(SVGNS, "text");
+      t.setAttribute("x", (pad + h * slot + bw / 2).toFixed(1));
+      t.setAttribute("y", H - 1);
+      t.setAttribute("text-anchor", "middle");
+      t.setAttribute("class", "hour-tick");
+      t.textContent = h === 0 ? "12a" : h === 12 ? "12p" : h === 6 ? "6a" : "6p";
+      svg.appendChild(t);
+    });
+    const peak = data.indexOf(max);
+    const fmtHr = (h) => (h === 0 ? "12 AM" : h < 12 ? `${h} AM` : h === 12 ? "12 PM" : `${h - 12} PM`);
+    $("hours-peak").textContent = `peak ${fmtHr(peak)}`;
   }
 
   /* ============================================================
@@ -1298,10 +1501,7 @@
 
     ctx.fillStyle = sub;
     ctx.font = "500 46px -apple-system, Helvetica, Arial, sans-serif";
-    const modeName =
-      r.mode === "sequence"
-        ? "Order"
-        : r.mode.charAt(0).toUpperCase() + r.mode.slice(1);
+    const modeName = modeLabel(r.mode);
     ctx.fillText(`${modeName} · Level ${r.level}`, W / 2, 850);
     if (r.combo >= 2)
       ctx.fillText(`Best combo ×${r.combo}`, W / 2, 910);
@@ -1547,8 +1747,12 @@
       stats.correctTaps = 0;
       stats.bestLevel = 0;
       stats.bestCombo = 0;
-      stats.best = { endless: 0, sprint: 0, daily: 0, sequence: 0 };
+      stats.best = { endless: 0, expert: 0, sprint: 0, daily: 0, sequence: 0 };
       stats.recent = [];
+      stats.recentAcc = [];
+      stats.playHours = Array(24).fill(0);
+      stats.modeAgg = {};
+      stats.dailyScores = {};
       stats.streak = { current: 0, longest: 0, last: null };
       stats.playDays = [];
       stats.achievements = [];
