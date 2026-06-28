@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/icon-180.png" />
   <link rel="icon" href="icons/icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=1.11.0" />
+  <link rel="stylesheet" href="style.css?v=1.12.0" />
   <title>Recall</title>
 </head>
 <body>
@@ -163,6 +163,13 @@
           <span class="row-label">High contrast</span>
           <button class="switch" id="contrast-toggle" role="switch" aria-checked="false" aria-label="High contrast"><span class="knob"></span></button>
         </div>
+
+        <label class="field-label" style="margin-top:6px">Notifications</label>
+        <div class="row-toggle">
+          <span class="row-label">Daily reminder</span>
+          <button class="switch" id="reminder-toggle" role="switch" aria-checked="false" aria-label="Daily reminder"><span class="knob"></span></button>
+        </div>
+        <p class="field-hint" id="reminder-hint">Get a nudge around noon when the new Daily is ready.</p>
 
         <label class="field-label" style="margin-top:6px">Progress</label>
         <div class="backup-row">
@@ -323,6 +330,6 @@
     <canvas id="share-canvas" width="1080" height="1350" hidden></canvas>
   </main>
 
-  <script src="game.js?v=1.11.0"></script>
+  <script src="game.js?v=1.12.0"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.11.0";
+  const VERSION = "1.12.0";
 
   /* ============================================================
      Elements
@@ -54,6 +54,7 @@
       haptics: true,
       adaptive: true,
       contrast: false,
+      dailyReminder: false,
     },
     readJSON(PREFS_KEY, {})
   );
@@ -991,7 +992,11 @@
       : Math.random;
 
     // Daily locks the moment it starts — one attempt per day, no resuming.
-    if (state.mode === "daily") stats.dailyDone = todayKey();
+    if (state.mode === "daily") {
+      stats.dailyDone = todayKey();
+      // Let the reminder worker know today's Daily is handled.
+      metaSet("dailyPlayed", todayKey());
+    }
 
     // Record today's play and advance the streak.
     registerPlay();
@@ -1147,6 +1152,137 @@
       /* ignore */
     }
     closeScreen($("a2hs-screen"));
+  }
+
+  /* ============================================================
+     Daily reminder — a single "the new Daily is ready" nudge ~noon
+     ============================================================ */
+  // A small bit of state the service worker can also read, so it knows whether
+  // reminders are on and whether today's Daily was already played. localStorage
+  // isn't visible to the worker, so we stash it in a Cache both sides can reach.
+  async function metaSet(key, value) {
+    try {
+      const c = await caches.open("recall-meta");
+      await c.put("/__meta/" + key, new Response(String(value)));
+    } catch {
+      /* caches unavailable — reminders just won't fire */
+    }
+  }
+  const PERIODIC_TAG = "daily-ready";
+  const REMINDER_MININTERVAL = 12 * 60 * 60 * 1000; // ~twice a day
+  const notifSupported = () =>
+    "Notification" in window && "serviceWorker" in navigator;
+  const notifGranted = () =>
+    notifSupported() && Notification.permission === "granted";
+
+  function setReminderSwitch(on) {
+    const sw = $("reminder-toggle");
+    if (!sw) return;
+    sw.classList.toggle("is-on", on);
+    sw.setAttribute("aria-checked", String(on));
+  }
+
+  // Reflect support/permission state in the Settings hint, and disable the
+  // toggle where notifications can't work at all (e.g. iOS Safari in a tab).
+  function refreshReminderHint() {
+    const hint = $("reminder-hint");
+    const sw = $("reminder-toggle");
+    if (!hint || !sw) return;
+    let text;
+    let disabled = false;
+    if (!notifSupported()) {
+      disabled = true;
+      text = isIosSafari()
+        ? "Add Recall to your Home Screen to enable reminders."
+        : "This browser doesn’t support notifications.";
+    } else if (Notification.permission === "denied") {
+      disabled = true;
+      text = "Notifications are blocked — turn them on in your browser settings.";
+    } else if (prefs.dailyReminder) {
+      text = "On — a nudge around noon when the new Daily is ready.";
+    } else {
+      text = "Get a nudge around noon when the new Daily is ready.";
+    }
+    hint.textContent = text;
+    sw.toggleAttribute("disabled", disabled);
+  }
+
+  // Ask the worker to wake up periodically; on supported installs it'll check
+  // the clock and post the reminder. (No backend — best effort where available.)
+  async function registerDailyReminder() {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      if (reg.periodicSync) {
+        await reg.periodicSync.register(PERIODIC_TAG, {
+          minInterval: REMINDER_MININTERVAL,
+        });
+      }
+    } catch {
+      /* periodic sync unavailable (most browsers) — toggle still set for part 2 */
+    }
+  }
+  async function unregisterDailyReminder() {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      if (reg.periodicSync) await reg.periodicSync.unregister(PERIODIC_TAG);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  // Turn reminders on: confirm permission first, then arm the worker.
+  async function enableReminders() {
+    if (!notifSupported()) return false;
+    let perm = Notification.permission;
+    if (perm === "default") {
+      try {
+        perm = await Notification.requestPermission();
+      } catch {
+        return false;
+      }
+    }
+    if (perm !== "granted") return false;
+    await metaSet("reminderOn", "1");
+    await registerDailyReminder();
+    return true;
+  }
+  async function disableReminders() {
+    await metaSet("reminderOn", "0");
+    await unregisterDailyReminder();
+  }
+
+  async function onReminderToggle() {
+    const sw = $("reminder-toggle");
+    if (sw && sw.hasAttribute("disabled")) return;
+    if (!prefs.dailyReminder) {
+      const ok = await enableReminders();
+      prefs.dailyReminder = ok;
+      if (ok) vibrate(12);
+    } else {
+      prefs.dailyReminder = false;
+      await disableReminders();
+    }
+    savePrefs();
+    setReminderSwitch(prefs.dailyReminder);
+    refreshReminderHint();
+  }
+
+  // On launch: re-arm if it was on (and permission still holds), or clear it.
+  function initReminders() {
+    setReminderSwitch(!!prefs.dailyReminder);
+    if (prefs.dailyReminder && notifGranted()) {
+      metaSet("reminderOn", "1");
+      registerDailyReminder();
+    } else if (prefs.dailyReminder) {
+      // Permission was revoked since last time — fall back to off.
+      prefs.dailyReminder = false;
+      savePrefs();
+      setReminderSwitch(false);
+      metaSet("reminderOn", "0");
+    } else {
+      metaSet("reminderOn", "0");
+    }
+    refreshReminderHint();
   }
 
   function goHome() {
@@ -1713,7 +1849,11 @@
   });
   backBtn.addEventListener("click", goHome);
 
-  $("open-settings").addEventListener("click", () => showScreen("settings"));
+  $("reminder-toggle").addEventListener("click", onReminderToggle);
+  $("open-settings").addEventListener("click", () => {
+    refreshReminderHint(); // permission may have changed outside the app
+    showScreen("settings");
+  });
   $("open-help").addEventListener("click", () => showScreen("help"));
   $("share-app").addEventListener("click", shareApp);
   $("tut-start").addEventListener("click", finishTutorial);
@@ -1881,9 +2021,14 @@
     $("app-version").textContent = "v" + VERSION;
     rollSubtitle();
     applyContrast();
+    initReminders();
 
     // Idle board behind the home screen.
     buildBoard(3);
+
+    // Opened from a Daily reminder? Preselect Daily and go straight in.
+    const wantDaily =
+      new URLSearchParams(location.search).get("daily") === "1";
 
     // First run: walk the player through a guided round.
     let seen = false;
@@ -1893,8 +2038,17 @@
       seen = true;
     }
     if (seen) {
-      showScreen("home");
-      maybePromptA2HS();
+      if (wantDaily) {
+        prefs.mode = "daily";
+        savePrefs();
+        syncSegmented("mode-seg", "daily");
+        syncHomeHints();
+        history.replaceState(null, "", location.pathname); // clear the param
+        enterModes();
+      } else {
+        showScreen("home");
+        maybePromptA2HS();
+      }
     } else {
       Object.values(screens).forEach((s) => (s.hidden = true));
       $("tutorial-screen").hidden = false;

@@ -580,6 +580,10 @@ body {
 .switch.is-on .knob {
   transform: translateX(21px);
 }
+.switch[disabled] {
+  opacity: 0.4;
+  pointer-events: none;
+}
 
 /* ---------- Buttons ---------- */
 .cta {

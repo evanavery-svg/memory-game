@@ -73,6 +73,12 @@ No build step, no dependencies.
 - **Personal-best deltas** — the end screen tells you how a run stacks up against
   your best for that mode: "+N over your best" when you beat it, or how far you
   fell short.
+- **Daily reminder** — an optional, off-by-default notification that nudges you
+  around noon when the new Daily is ready; tapping it opens straight to Daily.
+  Toggle it in Settings (needs notification permission, and on iOS the app must
+  be added to the Home Screen). Delivered locally where the browser supports
+  periodic background sync — guaranteed scheduled delivery would need a small
+  push backend.
 - **Back up & restore** — export your progress to a JSON file and import it on
   another device.
 - **Shareable result card** — a generated black-and-white image of your score
