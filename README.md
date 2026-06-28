@@ -76,9 +76,10 @@ No build step, no dependencies.
 - **Daily reminder** — an optional, off-by-default notification that nudges you
   around noon when the new Daily is ready; tapping it opens straight to Daily.
   Toggle it in Settings (needs notification permission, and on iOS the app must
-  be added to the Home Screen). Delivered locally where the browser supports
-  periodic background sync — guaranteed scheduled delivery would need a small
-  push backend.
+  be added to the Home Screen), where a **Send a test notification** button lets
+  you preview it. Delivered locally where the browser supports periodic
+  background sync — guaranteed scheduled delivery would need a small push
+  backend.
 - **Back up & restore** — export your progress to a JSON file and import it on
   another device.
 - **Shareable result card** — a generated black-and-white image of your score

@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.12.0";
+  const VERSION = "1.12.1";
 
   /* ============================================================
      Elements
@@ -1205,6 +1205,8 @@
     }
     hint.textContent = text;
     sw.toggleAttribute("disabled", disabled);
+    const test = $("test-notif");
+    if (test) test.toggleAttribute("disabled", disabled);
   }
 
   // Ask the worker to wake up periodically; on supported installs it'll check
@@ -1249,6 +1251,43 @@
   async function disableReminders() {
     await metaSet("reminderOn", "0");
     await unregisterDailyReminder();
+  }
+
+  // Fire one reminder right now so you can see exactly what it looks like.
+  // Requests permission first if it hasn't been asked yet.
+  async function sendTestNotification() {
+    const btn = $("test-notif");
+    if (!notifSupported() || (btn && btn.hasAttribute("disabled"))) return;
+    let perm = Notification.permission;
+    if (perm === "default") {
+      try {
+        perm = await Notification.requestPermission();
+      } catch {
+        return;
+      }
+    }
+    if (perm !== "granted") {
+      refreshReminderHint();
+      return;
+    }
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      await reg.showNotification("Today’s Daily is ready", {
+        body: "Test notification — you’re all set.",
+        icon: "./icons/icon-192.png",
+        badge: "./icons/icon-192.png",
+        tag: "daily-ready",
+        data: { url: "./?daily=1" },
+      });
+      vibrate(12);
+      if (btn) {
+        const label = btn.textContent;
+        btn.textContent = "Sent ✓";
+        setTimeout(() => (btn.textContent = label), 1600);
+      }
+    } catch {
+      /* showNotification can fail if the worker isn't ready yet */
+    }
   }
 
   async function onReminderToggle() {
@@ -1850,6 +1889,7 @@
   backBtn.addEventListener("click", goHome);
 
   $("reminder-toggle").addEventListener("click", onReminderToggle);
+  $("test-notif").addEventListener("click", sendTestNotification);
   $("open-settings").addEventListener("click", () => {
     refreshReminderHint(); // permission may have changed outside the app
     showScreen("settings");
