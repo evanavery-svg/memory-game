@@ -45,7 +45,7 @@ No build step, no dependencies.
   ×9. One miss resets it.
 - **Power-ups** — combos earn **Peek** (re-flash the pattern) and **Skip**
   (auto-clear a board). They surface beside the board only when you have them.
-- **Snake interludes** — every five levels (5, 10, 15…) the run breaks for a
+- **Snake interludes** — rarely (about 1 board in 100) the run breaks for a
   quick game of Snake on a 5×5 cube field. Tap **Start**, then swipe or use the
   arrow keys to eat the squares and grow; it starts slow and quickens with every
   bite. **Fill the whole board and your run score doubles.** The first time you

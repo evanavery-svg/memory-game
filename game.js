@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.16.0";
+  const VERSION = "1.16.1";
 
   /* ============================================================
      Elements
@@ -798,9 +798,9 @@
     bump(primaryEl);
     renderCombo();
 
-    // Every five levels, a quick Snake interlude instead of the next board.
+    // A rare (~1%) Snake interlude instead of the next board.
     // (Skipped in two-player — that mode is a straight head-to-head.)
-    const bonus = state.level % 5 === 0 && state.mode !== "versus";
+    const bonus = state.mode !== "versus" && Math.random() < SNAKE_CHANCE;
 
     if (granted) {
       promptEl.textContent = "Power-up earned";
@@ -975,6 +975,7 @@
      Snake interlude (every five levels — tap Start to play)
      ============================================================ */
   const SNAKE_N = 5; // a little 5×5 cube field
+  const SNAKE_CHANCE = 0.01; // ~1% of cleared boards spawn a Snake interlude
   const SNAKE_KEY = "recall.snakeBest";
   const SNAKE_SEEN_KEY = "recall.snakeSeen"; // first-encounter explainer flag
   let snake = null;
