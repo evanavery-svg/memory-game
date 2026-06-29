@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.14.0";
+  const VERSION = "1.15.0";
 
   /* ============================================================
      Elements
@@ -132,6 +132,11 @@
       ordered: true,
       hint: "Tiles flash in order — tap them back in the same order.",
     },
+    versus: {
+      label: "Level",
+      timed: false,
+      hint: "Two players, same boards — take turns; the higher score wins.",
+    },
   };
 
   const DIFFS = {
@@ -147,6 +152,7 @@
     sprint: "Sprint",
     daily: "Daily",
     sequence: "Order",
+    versus: "Versus",
   };
   const modeLabel = (m) =>
     MODE_NAMES[m] || (m ? m[0].toUpperCase() + m.slice(1) : "");
@@ -172,7 +178,6 @@
     hits: 0,
     locked: true,
     playing: false,
-    paused: false, // pause overlay is up
     snaking: false, // a Snake interlude is running
     rng: Math.random,
     timeLeft: 0,
@@ -551,20 +556,7 @@
     stats.calib = clamp(stats.calib + delta, -500, 700);
   }
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-  // A delay that stops counting down while the game is paused, so the whole
-  // round flow (flash, gaps, reveals) freezes and resumes cleanly.
-  const wait = (ms) =>
-    new Promise((resolve) => {
-      let remaining = ms;
-      let last = performance.now();
-      const step = (now) => {
-        if (!state.paused) remaining -= now - last;
-        last = now;
-        if (remaining <= 0) resolve();
-        else requestAnimationFrame(step);
-      };
-      requestAnimationFrame(step);
-    });
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
   /* ============================================================
      Rendering
@@ -721,7 +713,7 @@
   }
 
   function onTileClick(index, tile) {
-    if (state.locked || !state.playing || state.paused || state.snaking) return;
+    if (state.locked || !state.playing || state.snaking) return;
     if (state.found.has(index)) return;
     // Belt-and-suspenders against a stray double pointerdown on one press:
     // never process a tile that's already shown its result this round.
@@ -807,7 +799,8 @@
     renderCombo();
 
     // Every five levels, a quick Snake interlude instead of the next board.
-    const bonus = state.level % 5 === 0;
+    // (Skipped in two-player — that mode is a straight head-to-head.)
+    const bonus = state.level % 5 === 0 && state.mode !== "versus";
 
     if (granted) {
       promptEl.textContent = "Power-up earned";
@@ -972,38 +965,16 @@
   peekBtn.addEventListener("click", doPeek);
   skipBtn.addEventListener("click", doSkip);
 
-  /* ============================================================
-     Pause / resume
-     ============================================================ */
-  function pauseGame() {
-    if (!state.playing || state.paused || state.snaking) return;
-    state.paused = true; // freezes the timer and the round flow (see wait/timer)
-    hidePowerups();
-    $("pause-screen").hidden = false;
-  }
-  function resumeGame() {
-    if (!state.paused) return;
-    state.paused = false;
-    $("pause-screen").hidden = true;
-    renderPowerups();
-  }
-  // The top-bar back button: skip a Snake interlude, toggle pause mid-run, or
-  // (when not playing) return to the menu.
+  // The top-bar back button: leave a Snake interlude, or return to the menu.
   function onBack() {
-    if (state.snaking) {
-      endSnake();
-    } else if (state.playing) {
-      if (state.paused) resumeGame();
-      else pauseGame();
-    } else {
-      goHome();
-    }
+    if (state.snaking) endSnake();
+    else goHome();
   }
 
   /* ============================================================
-     Snake interlude (every five levels)
+     Snake interlude (every five levels — tap Start to play)
      ============================================================ */
-  const SNAKE_N = 11; // square play grid — keeps the cube look
+  const SNAKE_N = 3; // a little 3×3 cube field
   const SNAKE_KEY = "recall.snakeBest";
   let snake = null;
   let snakeCells = null;
@@ -1052,7 +1023,7 @@
 
   function setSnakeDir(x, y) {
     if (!snake || !snake.running) return;
-    if (snake.dir.x === -x && snake.dir.y === -y) return; // no 180° reversal
+    if (snake.dir && snake.dir.x === -x && snake.dir.y === -y) return; // no reversal
     snake.nextDir = { x, y };
   }
   function snakeKey(e) {
@@ -1091,6 +1062,7 @@
   }
 
   function snakeTickFn() {
+    if (!snake.nextDir) return; // sits still until the first swipe / arrow
     const dir = snake.nextDir;
     snake.dir = dir;
     const head = snake.body[snake.body.length - 1];
@@ -1132,6 +1104,8 @@
     $("snake-continue").hidden = false;
   }
 
+  // Show the interlude with an idle board and a Start button — it doesn't begin
+  // until the player taps Start (and then doesn't move until the first swipe).
   function startSnake(onDone) {
     if (!snakeCells) buildSnakeGrid();
     state.snaking = true;
@@ -1140,28 +1114,32 @@
     if (MODES[state.mode].timed) pauseTimer(); // the bonus doesn't burn Sprint time
     const mid = Math.floor(SNAKE_N / 2);
     snake = {
-      body: [
-        { x: mid - 1, y: mid },
-        { x: mid, y: mid },
-        { x: mid + 1, y: mid },
-      ],
-      dir: { x: 1, y: 0 },
-      nextDir: { x: 1, y: 0 },
+      body: [{ x: mid, y: mid }],
+      dir: null,
+      nextDir: null,
       food: null,
       score: 0,
-      tick: 170,
-      running: true,
+      tick: 240,
+      running: false,
       iv: null,
       onDone,
     };
     placeFood();
     $("snake-score").textContent = "0";
     $("snake-kicker").textContent = `Level ${state.level} reached`;
-    $("snake-hint").textContent = "Eat the squares. Swipe or use arrow keys.";
+    $("snake-hint").textContent = "Eat the squares — swipe or use arrow keys.";
+    $("snake-start").hidden = false;
     $("snake-continue").hidden = true;
     $("snake-screen").hidden = false;
-    document.addEventListener("keydown", snakeKey);
     renderSnake();
+  }
+
+  // Tap Start: arm controls and run the loop (the snake waits for a direction).
+  function beginSnakePlay() {
+    if (!snake || snake.running) return;
+    snake.running = true;
+    $("snake-start").hidden = true;
+    document.addEventListener("keydown", snakeKey);
     restartSnakeLoop();
   }
 
@@ -1172,29 +1150,69 @@
     document.removeEventListener("keydown", snakeKey);
     state.snaking = false;
     $("snake-screen").hidden = true;
+    $("snake-start").hidden = true;
     $("snake-continue").hidden = true;
-    if (MODES[state.mode].timed && state.playing && !state.paused) resumeTimer();
+    if (MODES[state.mode].timed && state.playing) resumeTimer();
     const done = snake && snake.onDone;
     snake = null;
     if (state.playing && done) done();
   }
 
   /* ============================================================
-     Level-up checkpoint
+     Two-player (pass-and-play). Both players face the same seeded boards;
+     highest score wins. No Snake interludes here.
      ============================================================ */
-  function showCheckpoint(level) {
-    $("checkpoint-num").textContent = level;
-    checkpointEl.classList.remove("closing");
-    checkpointEl.hidden = false;
-    // Restart the fade animation.
-    checkpointEl.style.animation = "none";
-    void checkpointEl.offsetWidth;
-    checkpointEl.style.animation = "";
-    sfx.checkpoint();
-    clearTimeout(checkpointEl._t);
-    checkpointEl._t = setTimeout(() => {
-      checkpointEl.hidden = true;
-    }, 1300);
+  function startVersusPlayer(n) {
+    state.vs.player = n;
+    state.level = 1;
+    state.score = 0;
+    state.combo = 1;
+    state.bestCombo = 1;
+    state.taps = 0;
+    state.hits = 0;
+    state.roundMisses = 0;
+    state.lives = state.maxLives;
+    state.peek = 0;
+    state.skip = 0;
+    state.usedSkip = false;
+    state.usedPeek = false;
+    state.playing = true;
+    state.locked = true;
+    // Same seed for both players → identical boards, a fair head-to-head.
+    state.rng = mulberry32(state.vs.seed);
+    dailyDateEl.textContent = `Player ${n}`;
+    dailyDateEl.hidden = false;
+    $("versus-screen").hidden = true;
+    powerupsEl.classList.remove("show", "reserved");
+    renderHUD();
+    renderLives();
+    startRound();
+  }
+
+  function versusRunEnded() {
+    const vs = state.vs;
+    vs.scores[vs.player - 1] = state.score;
+    vs.levels[vs.player - 1] = state.level;
+    dailyDateEl.hidden = true;
+    if (vs.player === 1) {
+      vs.phase = "handoff";
+      $("versus-kicker").textContent = "Player 1 done";
+      $("versus-title").textContent = "Pass the device";
+      $("versus-detail").textContent = `Player 1 scored ${vs.scores[0]} · level ${vs.levels[0]}`;
+      $("versus-next").textContent = "Player 2, go";
+      $("versus-home").hidden = true;
+    } else {
+      vs.phase = "result";
+      const [s1, s2] = vs.scores;
+      $("versus-kicker").textContent = "Result";
+      $("versus-title").textContent =
+        s1 === s2 ? "It's a tie!" : s1 > s2 ? "Player 1 wins!" : "Player 2 wins!";
+      $("versus-detail").textContent = `P1 ${s1} · L${vs.levels[0]}     P2 ${s2} · L${vs.levels[1]}`;
+      $("versus-next").textContent = "Rematch";
+      $("versus-home").hidden = false;
+      sfx.win();
+    }
+    $("versus-screen").hidden = false;
   }
 
   /* ============================================================
@@ -1213,7 +1231,7 @@
 
     const tick = (now) => {
       if (!state.playing) return;
-      const paused = timerPaused || tabHidden || state.paused;
+      const paused = timerPaused || tabHidden;
       // Clamp dt: while backgrounded rAF stalls, so the first frame back could
       // otherwise carry the entire hidden duration and drain the clock at once.
       const dt = paused ? 0 : Math.min((now - last) / 1000, 0.25);
@@ -1271,7 +1289,6 @@
     state.usedSkip = false;
     state.usedPeek = false;
     state.playing = true;
-    state.paused = false;
     state.snaking = false;
 
     state.rng = MODES[state.mode].seeded
@@ -1302,12 +1319,24 @@
       dailyDateEl.hidden = true;
     }
     powerupsEl.classList.remove("show", "reserved");
-    checkpointEl.hidden = true;
-    $("pause-screen").hidden = true;
     $("snake-screen").hidden = true;
+    $("versus-screen").hidden = true;
     renderHUD();
     renderLives();
     closeAllScreens();
+
+    // Two-player: set up a shared-seed match and hand the first turn to Player 1.
+    if (state.mode === "versus") {
+      state.vs = {
+        seed: (Math.random() * 1e9) | 0,
+        player: 1,
+        scores: [0, 0],
+        levels: [0, 0],
+        phase: null,
+      };
+      startVersusPlayer(1);
+      return;
+    }
 
     if (MODES[state.mode].timed) startTimer();
     startRound();
@@ -1321,6 +1350,12 @@
     hidePowerups();
     boardEl.classList.remove("interactive");
     sfx.over();
+
+    // Two-player runs stay out of the single-player stats; hand off instead.
+    if (state.mode === "versus") {
+      setTimeout(versusRunEnded, 650);
+      return;
+    }
 
     // Record stats.
     const reachedLevel = state.level; // level you were attempting
@@ -1647,14 +1682,14 @@
 
   function goHome() {
     state.playing = false;
-    // Tear down any pause/Snake interlude that was up.
+    // Tear down any Snake interlude / versus match that was up.
     if (snake && snake.iv) clearInterval(snake.iv);
     document.removeEventListener("keydown", snakeKey);
     snake = null;
-    state.paused = false;
     state.snaking = false;
-    $("pause-screen").hidden = true;
+    state.vs = null;
     $("snake-screen").hidden = true;
+    $("versus-screen").hidden = true;
     stopTimer();
     clearTimeout(quoteTimer);
     hudEl.hidden = true;
@@ -2216,10 +2251,14 @@
     }
   });
   backBtn.addEventListener("click", onBack);
-  $("resume-btn").addEventListener("click", resumeGame);
-  $("quit-btn").addEventListener("click", goHome);
+  $("snake-start").addEventListener("click", beginSnakePlay);
   $("snake-continue").addEventListener("click", endSnake);
   $("snake-skip").addEventListener("click", endSnake);
+  $("versus-next").addEventListener("click", () => {
+    if (state.vs && state.vs.phase === "handoff") startVersusPlayer(2);
+    else newGame(); // rematch — a fresh shared seed
+  });
+  $("versus-home").addEventListener("click", goHome);
 
   $("reminder-toggle").addEventListener("click", onReminderToggle);
   $("test-notif").addEventListener("click", sendTestNotification);

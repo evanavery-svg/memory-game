@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/icon-180.png" />
   <link rel="icon" href="icons/icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=1.14.0" />
+  <link rel="stylesheet" href="style.css?v=1.15.0" />
   <title>Recall</title>
 </head>
 <body>
@@ -102,13 +102,14 @@
       <div class="screen-inner modes-inner">
         <div class="field">
           <label class="field-label">Mode</label>
-          <div class="segmented mode-seg" id="mode-seg" data-store="mode" style="--count:5;--idx:0;" role="tablist">
+          <div class="segmented mode-seg" id="mode-seg" data-store="mode" style="--count:6;--idx:0;" role="tablist">
             <span class="thumb"></span>
             <button class="seg is-active" data-value="endless" role="tab">Endless</button>
             <button class="seg" data-value="expert" role="tab">Expert</button>
             <button class="seg" data-value="sprint" role="tab">Sprint</button>
             <button class="seg" data-value="daily" role="tab">Daily</button>
             <button class="seg" data-value="sequence" role="tab">Order</button>
+            <button class="seg" data-value="versus" role="tab">2P</button>
           </div>
           <p class="field-hint" id="mode-hint">Clear boards forever. Three lives.</p>
         </div>
@@ -327,15 +328,15 @@
       </div>
     </section>
 
-    <!-- ===== Pause ===== -->
-    <section class="screen" id="pause-screen" hidden role="dialog" aria-modal="true">
+    <!-- ===== Two-player handoff / result ===== -->
+    <section class="screen" id="versus-screen" hidden role="dialog" aria-modal="true">
       <div class="screen-inner">
-        <p class="end-kicker">Paused</p>
-        <h2 class="screen-title">Take a breath</h2>
-        <p class="field-hint">Your run is frozen — pick up right where you left off.</p>
+        <p class="end-kicker" id="versus-kicker">Player 1 done</p>
+        <h2 class="screen-title" id="versus-title">Pass the device</h2>
+        <p class="end-detail" id="versus-detail"></p>
         <div class="end-actions">
-          <button class="cta" id="resume-btn">Resume</button>
-          <button class="link-btn" id="quit-btn">Quit to menu</button>
+          <button class="cta" id="versus-next">Player 2, go</button>
+          <button class="link-btn" id="versus-home" hidden>Home</button>
         </div>
       </div>
     </section>
@@ -347,7 +348,8 @@
         <h2 class="screen-title">Snake</h2>
         <div class="snake-score"><span id="snake-score">0</span></div>
         <div class="snake-grid" id="snake-grid" aria-hidden="true"></div>
-        <p class="field-hint" id="snake-hint">Eat the squares. Swipe or use arrow keys.</p>
+        <p class="field-hint" id="snake-hint">Eat the squares — swipe or use arrow keys.</p>
+        <button class="cta" id="snake-start">Start</button>
         <button class="cta" id="snake-continue" hidden>Continue</button>
         <button class="link-btn" id="snake-skip">Skip</button>
       </div>
@@ -357,6 +359,6 @@
     <canvas id="share-canvas" width="1080" height="1350" hidden></canvas>
   </main>
 
-  <script src="game.js?v=1.14.0"></script>
+  <script src="game.js?v=1.15.0"></script>
 </body>
 </html>

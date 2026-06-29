@@ -22,7 +22,7 @@ No build step, no dependencies.
 
 ## Features
 
-- **Five modes**
+- **Six modes**
   - **Endless** — clear boards as far as you can.
   - **Expert** — for veterans: skips the gentle early boards and drops you in at
     level 8, with its own best score.
@@ -33,6 +33,9 @@ No build step, no dependencies.
     time. The ramp turns brutal from level 15 on. Today's date sits as a quiet
     caption under the wordmark while you play.
   - **Order** — tiles flash one at a time; tap them back in the same sequence.
+  - **2-Player** — pass-and-play: both players face the **same seeded boards**,
+    take turns, and the higher score wins. A handoff screen between turns, a
+    winner at the end, and a one-tap rematch.
 - **Adaptive difficulty** — flash time self-calibrates to your skill as you play
   (off in Daily, and can be disabled in Settings).
 - **First-run tutorial** — a short guided round the first time you open the app.
@@ -40,14 +43,11 @@ No build step, no dependencies.
   ×9. One miss resets it.
 - **Power-ups** — combos earn **Peek** (re-flash the pattern) and **Skip**
   (auto-clear a board). They surface beside the board only when you have them.
-- **Snake interludes** — every five levels (5, 10, 15…) the run pauses for a
-  quick game of Snake on the same cube grid. Swipe or use the arrow keys; eat
-  the squares to grow. It's a pure bonus — your score and lives carry on
-  untouched when you continue, and Sprint's clock is frozen while you play. Your
-  best Snake score is kept locally.
-- **Pause / resume** — the back button mid-run freezes everything (timer, flash,
-  board) behind a Resume / Quit overlay, so an interruption never costs you a
-  run.
+- **Snake interludes** — every five levels (5, 10, 15…) the run breaks for a
+  quick game of Snake on a little 3×3 cube field. Tap **Start**, then swipe or
+  use the arrow keys to eat the squares and grow. It's a pure bonus — your score
+  and lives carry on untouched when you continue, and Sprint's clock is frozen
+  while you play. Your best Snake score is kept locally. (Not in 2-Player.)
 - **Replay what you missed** — on game over the full board you were meant to
   clear flashes back, then marks which tiles you got versus missed, before the
   end screen.
