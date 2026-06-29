@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.12.1";
+  const VERSION = "1.12.2";
 
   /* ============================================================
      Elements
@@ -2098,7 +2098,7 @@
 
   /* ============================================================
      Quote interstitial — a little inspiration on memory & the mind.
-     One quote shows for ~5s after Play, then the mode bar fades in.
+     One quote shows briefly after Play, then the mode bar fades in.
      They advance each time, so consecutive runs never repeat.
      ============================================================ */
   const QUOTES = [
@@ -2146,7 +2146,7 @@
   }
 
   // Play on the landing screen → cross-fade to a single centred quote, hold it
-  // for 3s, then let it float down. The mode bar only appears once the float
+  // for 1s, then let it float down. The mode bar only appears once the float
   // has fully completed.
   function enterModes() {
     if (state.playing) return;
@@ -2173,7 +2173,7 @@
     });
 
     clearTimeout(quoteTimer);
-    quoteTimer = setTimeout(() => floatDown(quote), 3000);
+    quoteTimer = setTimeout(() => floatDown(quote), 1000);
   }
 
   function floatDown(quote) {
