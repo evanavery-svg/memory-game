@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.12.2";
+  const VERSION = "1.12.3";
 
   /* ============================================================
      Elements
@@ -2146,7 +2146,7 @@
   }
 
   // Play on the landing screen → cross-fade to a single centred quote, hold it
-  // for 1s, then let it float down. The mode bar only appears once the float
+  // briefly, then let it float down. The mode bar only appears once the float
   // has fully completed.
   function enterModes() {
     if (state.playing) return;
@@ -2173,7 +2173,7 @@
     });
 
     clearTimeout(quoteTimer);
-    quoteTimer = setTimeout(() => floatDown(quote), 1000);
+    quoteTimer = setTimeout(() => floatDown(quote), 700);
   }
 
   function floatDown(quote) {
@@ -2199,7 +2199,7 @@
         { transform: `translateY(${delta}px) scale(1.04)` },
         { transform: "translateY(0) scale(1)" },
       ],
-      { duration: 2000, easing: "cubic-bezier(0.37, 0, 0.63, 1)" }
+      { duration: 1600, easing: "cubic-bezier(0.37, 0, 0.63, 1)" }
     );
     anim.onfinish = reveal;
   }
