@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.15.0";
+  const VERSION = "1.16.0";
 
   /* ============================================================
      Elements
@@ -974,8 +974,9 @@
   /* ============================================================
      Snake interlude (every five levels — tap Start to play)
      ============================================================ */
-  const SNAKE_N = 3; // a little 3×3 cube field
+  const SNAKE_N = 5; // a little 5×5 cube field
   const SNAKE_KEY = "recall.snakeBest";
+  const SNAKE_SEEN_KEY = "recall.snakeSeen"; // first-encounter explainer flag
   let snake = null;
   let snakeCells = null;
 
@@ -1042,7 +1043,7 @@
     const occ = new Set(snake.body.map((s) => s.y * SNAKE_N + s.x));
     const free = [];
     for (let i = 0; i < SNAKE_N * SNAKE_N; i++) if (!occ.has(i)) free.push(i);
-    if (!free.length) return snakeDie(); // filled the board — a clean win
+    if (!free.length) return snakeWin(); // filled the whole board — a clean win
     const idx = free[Math.floor(Math.random() * free.length)];
     snake.food = { x: idx % SNAKE_N, y: Math.floor(idx / SNAKE_N) };
   }
@@ -1081,8 +1082,8 @@
       $("snake-score").textContent = snake.score;
       sfx.correct(snake.score);
       placeFood();
-      snake.tick = Math.max(85, snake.tick - 6); // speed up a touch each bite
-      restartSnakeLoop();
+      snake.tick = Math.max(110, snake.tick - 16); // starts slow, quickens each bite
+      if (snake.running) restartSnakeLoop();
     } else {
       snake.body.shift();
     }
@@ -1104,6 +1105,25 @@
     $("snake-continue").hidden = false;
   }
 
+  // Filled the whole board — a clean win. Big reward: double your run score.
+  function snakeWin() {
+    if (!snake || !snake.running) return;
+    snake.running = false;
+    if (snake.iv) clearInterval(snake.iv);
+    snake.food = null;
+    renderSnake(); // show the fully-filled board
+    state.score *= 2;
+    renderHUD();
+    bump(scoreEl);
+    sfx.win();
+    setTimeout(() => sfx.milestone(), 160);
+    const best = Math.max(snakeBest(), snake.score);
+    setSnakeBest(best);
+    $("snake-kicker").textContent = "Board cleared!";
+    $("snake-hint").textContent = "Perfect — your score just doubled.";
+    $("snake-continue").hidden = false;
+  }
+
   // Show the interlude with an idle board and a Start button — it doesn't begin
   // until the player taps Start (and then doesn't move until the first swipe).
   function startSnake(onDone) {
@@ -1119,7 +1139,7 @@
       nextDir: null,
       food: null,
       score: 0,
-      tick: 240,
+      tick: 320, // starts slow; quickens with every bite
       running: false,
       iv: null,
       onDone,
@@ -1127,7 +1147,21 @@
     placeFood();
     $("snake-score").textContent = "0";
     $("snake-kicker").textContent = `Level ${state.level} reached`;
-    $("snake-hint").textContent = "Eat the squares — swipe or use arrow keys.";
+    // The first time you ever hit a Snake round, explain what it is.
+    let snakeSeen = false;
+    try {
+      snakeSeen = !!localStorage.getItem(SNAKE_SEEN_KEY);
+    } catch {
+      snakeSeen = true;
+    }
+    $("snake-hint").textContent = snakeSeen
+      ? "Eat the squares — swipe or use arrow keys."
+      : "Bonus round! Eat the squares to grow — fill the whole board and your score doubles. Swipe or use the arrow keys.";
+    try {
+      localStorage.setItem(SNAKE_SEEN_KEY, "1");
+    } catch {
+      /* ignore */
+    }
     $("snake-start").hidden = false;
     $("snake-continue").hidden = true;
     $("snake-screen").hidden = false;
@@ -1265,14 +1299,17 @@
   /* ============================================================
      Game lifecycle
      ============================================================ */
-  function newGame() {
+  function newGame(modeOverride) {
     ac(); // unlock audio
+    // Two-player is launched as an override (Endless → 2 Players); event
+    // handlers pass an Event here, so only honour a real string.
+    const mode = typeof modeOverride === "string" ? modeOverride : prefs.mode;
     // Daily is locked to one run per day — already played today? Bounce home.
-    if (prefs.mode === "daily" && dailyDoneToday()) {
+    if (mode === "daily" && dailyDoneToday()) {
       goHome();
       return;
     }
-    state.mode = prefs.mode;
+    state.mode = mode;
     state.diff = prefs.difficulty;
     // Expert skips the gentle early boards and drops you in deep.
     state.level = MODES[state.mode].headStart || 1;
@@ -1321,6 +1358,7 @@
     powerupsEl.classList.remove("show", "reserved");
     $("snake-screen").hidden = true;
     $("versus-screen").hidden = true;
+    $("players-screen").hidden = true;
     renderHUD();
     renderLives();
     closeAllScreens();
@@ -1690,6 +1728,7 @@
     state.vs = null;
     $("snake-screen").hidden = true;
     $("versus-screen").hidden = true;
+    $("players-screen").hidden = true;
     stopTimer();
     clearTimeout(quoteTimer);
     hudEl.hidden = true;
@@ -2220,7 +2259,16 @@
   initSwitch("contrast-toggle", "contrast", applyContrast);
 
   $("play-btn").addEventListener("click", enterModes);
-  $("start-btn").addEventListener("click", newGame);
+  // Endless asks 1P or 2P first; the other modes start straight away.
+  $("start-btn").addEventListener("click", () => {
+    if (prefs.mode === "endless") $("players-screen").hidden = false;
+    else newGame();
+  });
+  $("players-1").addEventListener("click", () => newGame("endless"));
+  $("players-2").addEventListener("click", () => newGame("versus"));
+  $("players-back").addEventListener("click", () => {
+    $("players-screen").hidden = true;
+  });
   $("again-btn").addEventListener("click", newGame);
   $("end-home").addEventListener("click", goHome);
   $("share-btn").addEventListener("click", shareResult);
@@ -2256,7 +2304,7 @@
   $("snake-skip").addEventListener("click", endSnake);
   $("versus-next").addEventListener("click", () => {
     if (state.vs && state.vs.phase === "handoff") startVersusPlayer(2);
-    else newGame(); // rematch — a fresh shared seed
+    else newGame("versus"); // rematch — a fresh shared seed
   });
   $("versus-home").addEventListener("click", goHome);
 
@@ -2390,8 +2438,16 @@
   /* ============================================================
      Init
      ============================================================ */
+  // Modes shown on the bar. Expert/Sprint/Versus still exist in MODES but aren't
+  // selectable here, so fold any stale saved preference back to a visible one.
+  const BAR_MODES = ["endless", "daily", "sequence"];
+
   function init() {
     applyTheme();
+    if (!BAR_MODES.includes(prefs.mode)) {
+      prefs.mode = "endless";
+      savePrefs();
+    }
     syncSegmented("mode-seg", prefs.mode);
     syncSegmented("diff-seg", prefs.difficulty);
     syncHomeHints();

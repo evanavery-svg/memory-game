@@ -22,20 +22,22 @@ No build step, no dependencies.
 
 ## Features
 
-- **Six modes**
-  - **Endless** — clear boards as far as you can.
-  - **Expert** — for veterans: skips the gentle early boards and drops you in at
-    level 8, with its own best score.
-  - **Sprint** — most points in 60 seconds; a miss costs time instead of a life.
+- **Three modes** on the bar — **Endless**, **Daily**, **Order**:
+  - **Endless** — clear boards as far as you can. Choosing it asks **1 or 2
+    players**:
+    - **1 Player** — a normal solo run.
+    - **2 Players** — pass-and-play: both players face the **same seeded boards**,
+      take turns, and the higher score wins, with a handoff screen between turns,
+      a winner at the end, and a one-tap rematch.
   - **Daily** — a deterministic seed gives everyone the same boards each day,
     with a spoiler-free, Wordle-style result you can copy and share. One run per
     day — it locks the moment you start (no retries) and resets at midnight local
     time. The ramp turns brutal from level 15 on. Today's date sits as a quiet
     caption under the wordmark while you play.
   - **Order** — tiles flash one at a time; tap them back in the same sequence.
-  - **2-Player** — pass-and-play: both players face the **same seeded boards**,
-    take turns, and the higher score wins. A handoff screen between turns, a
-    winner at the end, and a one-tap rematch.
+
+  *(Expert and Sprint modes still live in the code — see the note in
+  `index.html` — but are off the bar by default.)*
 - **Adaptive difficulty** — flash time self-calibrates to your skill as you play
   (off in Daily, and can be disabled in Settings).
 - **First-run tutorial** — a short guided round the first time you open the app.
@@ -44,10 +46,11 @@ No build step, no dependencies.
 - **Power-ups** — combos earn **Peek** (re-flash the pattern) and **Skip**
   (auto-clear a board). They surface beside the board only when you have them.
 - **Snake interludes** — every five levels (5, 10, 15…) the run breaks for a
-  quick game of Snake on a little 3×3 cube field. Tap **Start**, then swipe or
-  use the arrow keys to eat the squares and grow. It's a pure bonus — your score
-  and lives carry on untouched when you continue, and Sprint's clock is frozen
-  while you play. Your best Snake score is kept locally. (Not in 2-Player.)
+  quick game of Snake on a 5×5 cube field. Tap **Start**, then swipe or use the
+  arrow keys to eat the squares and grow; it starts slow and quickens with every
+  bite. **Fill the whole board and your run score doubles.** The first time you
+  hit one, it explains itself. A pure bonus otherwise — your lives carry on, and
+  your best Snake score is kept locally. (Not in two-player.)
 - **Replay what you missed** — on game over the full board you were meant to
   clear flashes back, then marks which tiles you got versus missed, before the
   end screen.

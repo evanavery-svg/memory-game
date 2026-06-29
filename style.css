@@ -1379,13 +1379,12 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* ---------- 6-up mode selector ---------- */
-/* The mode segmented control holds six options — tighten the type so the labels
-   ("Endless", "Expert", "Sprint", "Daily", "Order", "2P") fit on narrow phones. */
+/* ---------- Mode selector ---------- */
+/* Three options on the bar (Endless · Daily · Order) — comfortable type. */
 .segmented.mode-seg .seg {
-  font-size: 11px;
-  padding: 11px 0;
-  letter-spacing: -0.04em;
+  font-size: 14px;
+  padding: 11px 4px;
+  letter-spacing: -0.02em;
 }
 
 /* ---------- Tutorial ---------- */

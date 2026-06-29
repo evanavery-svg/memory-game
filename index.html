@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/icon-180.png" />
   <link rel="icon" href="icons/icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=1.15.0" />
+  <link rel="stylesheet" href="style.css?v=1.16.0" />
   <title>Recall</title>
 </head>
 <body>
@@ -102,14 +102,15 @@
       <div class="screen-inner modes-inner">
         <div class="field">
           <label class="field-label">Mode</label>
-          <div class="segmented mode-seg" id="mode-seg" data-store="mode" style="--count:6;--idx:0;" role="tablist">
+          <!-- Expert, Sprint and a standalone 2P tab are intentionally not shown
+               here; their modes still exist in game.js. To re-enable one, add its
+               <button> back and bump --count. (Two-player is reached by choosing
+               Endless → 2 Players.) -->
+          <div class="segmented mode-seg" id="mode-seg" data-store="mode" style="--count:3;--idx:0;" role="tablist">
             <span class="thumb"></span>
             <button class="seg is-active" data-value="endless" role="tab">Endless</button>
-            <button class="seg" data-value="expert" role="tab">Expert</button>
-            <button class="seg" data-value="sprint" role="tab">Sprint</button>
             <button class="seg" data-value="daily" role="tab">Daily</button>
             <button class="seg" data-value="sequence" role="tab">Order</button>
-            <button class="seg" data-value="versus" role="tab">2P</button>
           </div>
           <p class="field-hint" id="mode-hint">Clear boards forever. Three lives.</p>
         </div>
@@ -328,6 +329,19 @@
       </div>
     </section>
 
+    <!-- ===== Endless: 1 or 2 players? ===== -->
+    <section class="screen" id="players-screen" hidden role="dialog" aria-modal="true">
+      <div class="screen-inner">
+        <p class="end-kicker">Endless</p>
+        <h2 class="screen-title">How many players?</h2>
+        <div class="end-actions">
+          <button class="cta" id="players-1">1 Player</button>
+          <button class="cta ghost" id="players-2">2 Players</button>
+          <button class="link-btn" id="players-back">Back</button>
+        </div>
+      </div>
+    </section>
+
     <!-- ===== Two-player handoff / result ===== -->
     <section class="screen" id="versus-screen" hidden role="dialog" aria-modal="true">
       <div class="screen-inner">
@@ -359,6 +373,6 @@
     <canvas id="share-canvas" width="1080" height="1350" hidden></canvas>
   </main>
 
-  <script src="game.js?v=1.15.0"></script>
+  <script src="game.js?v=1.16.0"></script>
 </body>
 </html>
