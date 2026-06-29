@@ -62,10 +62,12 @@ No build step, no dependencies.
 - **Accessibility** — a high-contrast option, keyboard focus outlines, live
   status announcements for each round phase, and reduced-motion support.
 - **Sound & haptics** — generated WebAudio tones (no asset files) and vibration
-  on supported devices. The palette is deliberately minimal: short, quiet cues
-  with a faint warm body, plus distinct touches for earning a power-up, using
-  Peek vs. Skip, and clearing a colorful board. Both sound and haptics can be
-  muted.
+  on supported devices. The palette is deliberately minimal: short, quiet cues,
+  each gently detuned for warmth and run through a shared mastering chain — a
+  soft low-pass, a limiter to glue overlapping notes, and a subtle reverb for
+  space — so nothing sounds like a raw beep. Distinct touches for earning a
+  power-up, using Peek vs. Skip, and clearing a colorful board. Both sound and
+  haptics can be muted.
 - **Stats & history** — games played, tap accuracy, best level, best combo,
   sparklines of recent scores and your accuracy trend, a "when you play"
   time-of-day chart, and per-mode bests with the average level you reach in each.

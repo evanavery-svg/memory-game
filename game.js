@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.13.0";
+  const VERSION = "1.13.1";
 
   /* ============================================================
      Elements
@@ -347,6 +347,7 @@
      Sound (WebAudio, generated tones) + haptics
      ============================================================ */
   let audioCtx = null;
+  let master = null; // shared output chain (filter → limiter → out, + reverb)
   function ac() {
     if (!audioCtx) {
       const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -355,28 +356,84 @@
     if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
     return audioCtx;
   }
-  function tone(freq, dur, { type = "sine", gain = 0.06, slideTo = null, body = false } = {}) {
+  // A short, generated impulse response — decaying noise — used for a subtle
+  // reverb that gives the tones a sense of space instead of a dead, dry beep.
+  function makeImpulse(ctx, seconds, decay) {
+    const len = Math.max(1, Math.floor(seconds * ctx.sampleRate));
+    const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = buf.getChannelData(ch);
+      for (let i = 0; i < len; i++)
+        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+    }
+    return buf;
+  }
+  // Build the shared output chain once: a gentle low-pass rounds off harsh
+  // edges, a soft limiter glues overlapping notes so nothing clips, and a quiet
+  // reverb send adds air. Everything routes through this.
+  function audioMaster(ctx) {
+    if (master) return master;
+    try {
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = 5200;
+      lp.Q.value = 0.5;
+      const comp = ctx.createDynamicsCompressor();
+      comp.threshold.value = -16;
+      comp.knee.value = 26;
+      comp.ratio.value = 3;
+      comp.attack.value = 0.003;
+      comp.release.value = 0.2;
+      lp.connect(comp).connect(ctx.destination);
+      const conv = ctx.createConvolver();
+      conv.buffer = makeImpulse(ctx, 0.5, 2.6);
+      conv.connect(comp); // reverb returns just before the limiter
+      master = { input: lp, reverb: conv };
+    } catch {
+      master = { input: ctx.destination, reverb: null };
+    }
+    return master;
+  }
+  function tone(
+    freq,
+    dur,
+    { type = "sine", gain = 0.06, slideTo = null, body = false, reverb = 0.14 } = {}
+  ) {
     if (!prefs.sound) return;
     const ctx = ac();
     if (!ctx) return;
+    const m = audioMaster(ctx);
     const t0 = ctx.currentTime;
-    const voice = (f, g, ty, to) => {
+    // Per-tone mix node: fans the note out to the master chain and, optionally,
+    // the reverb send.
+    const out = ctx.createGain();
+    out.gain.value = 1;
+    out.connect(m.input);
+    if (reverb > 0 && m.reverb) {
+      const send = ctx.createGain();
+      send.gain.value = reverb;
+      out.connect(send).connect(m.reverb);
+    }
+    const tail = dur + 0.06;
+    const voice = (f, g, ty, to, detune) => {
       const osc = ctx.createOscillator();
       const gn = ctx.createGain();
       osc.type = ty;
+      if (detune) osc.detune.value = detune;
       osc.frequency.setValueAtTime(f, t0);
       if (to) osc.frequency.exponentialRampToValueAtTime(to, t0 + dur);
       gn.gain.setValueAtTime(0, t0);
-      gn.gain.linearRampToValueAtTime(g, t0 + 0.008);
-      gn.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-      osc.connect(gn).connect(ctx.destination);
+      gn.gain.linearRampToValueAtTime(g, t0 + 0.012); // soft attack — no click
+      gn.gain.exponentialRampToValueAtTime(0.0001, t0 + tail); // smooth tail
+      osc.connect(gn).connect(out);
       osc.start(t0);
-      osc.stop(t0 + dur + 0.02);
+      osc.stop(t0 + tail + 0.03);
     };
-    voice(freq, gain, type, slideTo);
-    // A faint octave-below sine adds warm body so the beep feels designed, not
-    // thin — still one quiet sound, never a chord you'd notice.
-    if (body) voice(freq / 2, gain * 0.4, "sine", slideTo ? slideTo / 2 : null);
+    // The main note, gently doubled a few cents apart for a warmer, fuller body.
+    voice(freq, gain, type, slideTo, 0);
+    voice(freq, gain * 0.5, type, slideTo, 7);
+    // A faint octave-below sine adds low-end weight without muddiness.
+    if (body) voice(freq / 2, gain * 0.36, "sine", slideTo ? slideTo / 2 : null, 0);
   }
   function vibrate(pattern) {
     if (prefs.haptics && navigator.vibrate) navigator.vibrate(pattern);
@@ -401,7 +458,7 @@
       tone(330, 0.3, { type: "triangle", gain: 0.06, slideTo: 130 });
       vibrate([30, 60, 30]);
     },
-    tick: () => tone(880, 0.05, { gain: 0.04 }),
+    tick: () => tone(880, 0.05, { gain: 0.04, reverb: 0 }),
     unlock: () => {
       tone(659.25, 0.1, { gain: 0.05, body: true });
       setTimeout(() => tone(987.77, 0.16, { gain: 0.05, body: true }), 70);
