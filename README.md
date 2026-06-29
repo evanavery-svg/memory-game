@@ -74,7 +74,9 @@ No build step, no dependencies.
   your best for that mode: "+N over your best" when you beat it, or how far you
   fell short.
 - **Daily reminder** — an optional, off-by-default notification that nudges you
-  around noon when the new Daily is ready; tapping it opens straight to Daily.
+  around noon when the new Daily is ready, plus an evening "last call" before it
+  resets at midnight — streak-aware, so it tells you when a run is on the line.
+  Tapping either opens straight to Daily.
   Toggle it in Settings (needs notification permission, and on iOS the app must
   be added to the Home Screen), where a **Send a test notification** button lets
   you preview it. Delivered locally where the browser supports periodic

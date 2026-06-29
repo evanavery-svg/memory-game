@@ -1,13 +1,13 @@
 /* Recall service worker — offline-first caching */
-const CACHE = "recall-v35";
+const CACHE = "recall-v36";
 // A separate cache the page and worker both use as a tiny key/value store
 // (the worker can't read localStorage). Kept across activations.
 const META = "recall-meta";
 const ASSETS = [
   "./",
   "./index.html",
-  "./style.css?v=1.12.3",
-  "./game.js?v=1.12.3",
+  "./style.css?v=1.13.0",
+  "./game.js?v=1.13.0",
   "./manifest.webmanifest",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
@@ -124,28 +124,64 @@ const REMINDER_BODY = "A fresh set of Recall boards is up.";
 const REMINDER_ICON = "./icons/icon-192.png";
 const REMINDER_URL = "./?daily=1";
 
-// Best-effort local delivery (no backend): on browsers that grant Periodic
-// Background Sync to installed apps, the worker wakes up and — if it's around
-// midday, reminders are on, and today's Daily hasn't been played or already
-// flagged — posts a single notification.
-async function maybeNotifyDaily() {
-  if ((await metaGet("reminderOn")) !== "1") return;
-  const now = new Date();
-  const today = localDateKey(now);
-  if ((await metaGet("notifiedDate")) === today) return; // already nudged today
-  if ((await metaGet("dailyPlayed")) === today) {
-    await metaSet("notifiedDate", today); // already played — no need to nag
-    return;
-  }
-  if (now.getHours() < 11) return; // hold until around noon
-  await self.registration.showNotification(REMINDER_TITLE, {
-    body: REMINDER_BODY,
+function showDaily(title, body) {
+  return self.registration.showNotification(title, {
+    body,
     icon: REMINDER_ICON,
     badge: REMINDER_ICON,
     tag: "daily-ready",
     data: { url: REMINDER_URL },
   });
-  await metaSet("notifiedDate", today);
+}
+
+// Best-effort local delivery (no backend): on browsers that grant Periodic
+// Background Sync to installed apps, the worker wakes up and — if reminders are
+// on and today's Daily hasn't been played — posts at most one midday nudge
+// ("it's ready") and one evening nudge ("it's about to expire", streak-aware).
+async function maybeNotifyDaily() {
+  if ((await metaGet("reminderOn")) !== "1") return;
+  const now = new Date();
+  const today = localDateKey(now);
+
+  // Already played today? Nothing to nudge — mark both windows done.
+  if ((await metaGet("dailyPlayed")) === today) {
+    await metaSet("readyNotified", today);
+    await metaSet("expiryNotified", today);
+    return;
+  }
+
+  const hour = now.getHours();
+
+  // Evening: the Daily is about to reset, and a streak may be on the line.
+  if (hour >= 20) {
+    if ((await metaGet("expiryNotified")) === today) return;
+    const streak = parseInt((await metaGet("streakCurrent")) || "0", 10);
+    const last = await metaGet("streakLast");
+    const yesterday = localDateKey(new Date(now.getTime() - 86400000));
+    // A streak is only really at risk if it ran through yesterday and today
+    // hasn't been played yet — otherwise it's already broken or not started.
+    if (streak >= 2 && last === yesterday) {
+      await showDaily(
+        `Your ${streak}-day streak ends at midnight`,
+        "Play today’s Daily to keep it going."
+      );
+    } else {
+      await showDaily(
+        "Last call — today’s Daily",
+        "It resets at midnight. Don’t miss it."
+      );
+    }
+    await metaSet("expiryNotified", today);
+    return;
+  }
+
+  // Midday: the new Daily is ready.
+  if (hour >= 11) {
+    if ((await metaGet("readyNotified")) === today) return;
+    await showDaily(REMINDER_TITLE, REMINDER_BODY);
+    await metaSet("readyNotified", today);
+    return;
+  }
 }
 
 self.addEventListener("periodicsync", (event) => {

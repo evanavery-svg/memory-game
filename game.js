@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.12.3";
+  const VERSION = "1.13.0";
 
   /* ============================================================
      Elements
@@ -1000,6 +1000,7 @@
 
     // Record today's play and advance the streak.
     registerPlay();
+    pushStreakMeta(); // keep the reminder worker's streak info fresh
     checkAchievements();
 
     hudEl.hidden = false;
@@ -1168,6 +1169,12 @@
       /* caches unavailable — reminders just won't fire */
     }
   }
+  // Share the current streak with the worker so the evening "about to expire"
+  // nudge can tell you exactly what's on the line.
+  function pushStreakMeta() {
+    metaSet("streakCurrent", stats.streak.current || 0);
+    metaSet("streakLast", stats.streak.last || "");
+  }
   const PERIODIC_TAG = "daily-ready";
   const REMINDER_MININTERVAL = 12 * 60 * 60 * 1000; // ~twice a day
   const notifSupported = () =>
@@ -1199,9 +1206,11 @@
       disabled = true;
       text = "Notifications are blocked — turn them on in your browser settings.";
     } else if (prefs.dailyReminder) {
-      text = "On — a nudge around noon when the new Daily is ready.";
+      text =
+        "On — a nudge around noon when the new Daily is ready, and an evening heads-up before it resets.";
     } else {
-      text = "Get a nudge around noon when the new Daily is ready.";
+      text =
+        "A nudge around noon when the new Daily is ready, plus an evening heads-up before it resets (and your streak’s on the line).";
     }
     hint.textContent = text;
     sw.toggleAttribute("disabled", disabled);
@@ -1309,6 +1318,7 @@
   // On launch: re-arm if it was on (and permission still holds), or clear it.
   function initReminders() {
     setReminderSwitch(!!prefs.dailyReminder);
+    pushStreakMeta();
     if (prefs.dailyReminder && notifGranted()) {
       metaSet("reminderOn", "1");
       registerDailyReminder();
