@@ -1512,6 +1512,62 @@ body {
   outline-offset: -3px;
 }
 
+/* ---------- Snake interlude ---------- */
+/* Opaque backdrop (not the frosted scrim) so the board behind never bleeds
+   through — the interlude gets a clean, focused field. */
+.snake-screen {
+  background: var(--bg);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.snake-inner {
+  text-align: center;
+}
+.snake-score {
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  margin: 6px 0 12px;
+}
+.snake-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--n, 11), 1fr);
+  gap: 4px;
+  width: 100%;
+  max-width: min(82vw, 340px);
+  aspect-ratio: 1 / 1;
+  margin: 0 auto 14px;
+  touch-action: none; /* swipes steer the snake, not the page */
+}
+.snake-cell {
+  position: relative;
+  border-radius: 5px;
+  background: var(--tile);
+  border: 1px solid var(--tile-edge);
+}
+.snake-cell.on {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+.snake-cell.head::after {
+  content: "";
+  position: absolute;
+  inset: 26%;
+  border-radius: 50%;
+  background: var(--bg);
+}
+/* Food is an outline ring so it reads distinctly against the solid snake. */
+.snake-cell.food {
+  background: var(--bg);
+  box-shadow: inset 0 0 0 2px var(--ink);
+  animation: snakeFood 1s var(--ease) infinite;
+}
+@keyframes snakeFood {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(0.82); }
+}
+
 /* ---------- Backup row ---------- */
 .backup-row {
   display: flex;

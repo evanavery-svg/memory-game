@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/icon-180.png" />
   <link rel="icon" href="icons/icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=1.13.1" />
+  <link rel="stylesheet" href="style.css?v=1.14.0" />
   <title>Recall</title>
 </head>
 <body>
@@ -327,10 +327,36 @@
       </div>
     </section>
 
+    <!-- ===== Pause ===== -->
+    <section class="screen" id="pause-screen" hidden role="dialog" aria-modal="true">
+      <div class="screen-inner">
+        <p class="end-kicker">Paused</p>
+        <h2 class="screen-title">Take a breath</h2>
+        <p class="field-hint">Your run is frozen — pick up right where you left off.</p>
+        <div class="end-actions">
+          <button class="cta" id="resume-btn">Resume</button>
+          <button class="link-btn" id="quit-btn">Quit to menu</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Snake interlude (every five levels) ===== -->
+    <section class="screen snake-screen" id="snake-screen" hidden role="dialog" aria-modal="true">
+      <div class="screen-inner snake-inner">
+        <p class="end-kicker" id="snake-kicker">Bonus round</p>
+        <h2 class="screen-title">Snake</h2>
+        <div class="snake-score"><span id="snake-score">0</span></div>
+        <div class="snake-grid" id="snake-grid" aria-hidden="true"></div>
+        <p class="field-hint" id="snake-hint">Eat the squares. Swipe or use arrow keys.</p>
+        <button class="cta" id="snake-continue" hidden>Continue</button>
+        <button class="link-btn" id="snake-skip">Skip</button>
+      </div>
+    </section>
+
     <!-- Hidden canvas for share-card rendering -->
     <canvas id="share-canvas" width="1080" height="1350" hidden></canvas>
   </main>
 
-  <script src="game.js?v=1.13.1"></script>
+  <script src="game.js?v=1.14.0"></script>
 </body>
 </html>

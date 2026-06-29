@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.13.1";
+  const VERSION = "1.14.0";
 
   /* ============================================================
      Elements
@@ -172,6 +172,8 @@
     hits: 0,
     locked: true,
     playing: false,
+    paused: false, // pause overlay is up
+    snaking: false, // a Snake interlude is running
     rng: Math.random,
     timeLeft: 0,
     timerId: null,
@@ -549,7 +551,20 @@
     stats.calib = clamp(stats.calib + delta, -500, 700);
   }
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  // A delay that stops counting down while the game is paused, so the whole
+  // round flow (flash, gaps, reveals) freezes and resumes cleanly.
+  const wait = (ms) =>
+    new Promise((resolve) => {
+      let remaining = ms;
+      let last = performance.now();
+      const step = (now) => {
+        if (!state.paused) remaining -= now - last;
+        last = now;
+        if (remaining <= 0) resolve();
+        else requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    });
 
   /* ============================================================
      Rendering
@@ -706,7 +721,8 @@
   }
 
   function onTileClick(index, tile) {
-    if (state.locked || !state.playing || state.found.has(index)) return;
+    if (state.locked || !state.playing || state.paused || state.snaking) return;
+    if (state.found.has(index)) return;
     // Belt-and-suspenders against a stray double pointerdown on one press:
     // never process a tile that's already shown its result this round.
     if (tile.classList.contains("wrong") || tile.classList.contains("correct"))
@@ -790,9 +806,8 @@
     bump(primaryEl);
     renderCombo();
 
-    // Level-up checkpoint every 5 levels.
-    const checkpoint = state.level % 5 === 0;
-    if (checkpoint) showCheckpoint(state.level);
+    // Every five levels, a quick Snake interlude instead of the next board.
+    const bonus = state.level % 5 === 0;
 
     if (granted) {
       promptEl.textContent = "Power-up earned";
@@ -802,12 +817,18 @@
       promptEl.textContent =
         state.combo >= 2 ? `Perfect · ×${state.combo}` : "Perfect";
     }
-    setTimeout(
-      () => {
+    if (bonus) {
+      setTimeout(() => {
+        if (state.playing)
+          startSnake(() => {
+            if (state.playing) startRound();
+          });
+      }, 700);
+    } else {
+      setTimeout(() => {
         if (state.playing) startRound();
-      },
-      checkpoint ? 1450 : 820
-    );
+      }, 820);
+    }
   }
 
   function missed(wrongTile) {
@@ -952,6 +973,213 @@
   skipBtn.addEventListener("click", doSkip);
 
   /* ============================================================
+     Pause / resume
+     ============================================================ */
+  function pauseGame() {
+    if (!state.playing || state.paused || state.snaking) return;
+    state.paused = true; // freezes the timer and the round flow (see wait/timer)
+    hidePowerups();
+    $("pause-screen").hidden = false;
+  }
+  function resumeGame() {
+    if (!state.paused) return;
+    state.paused = false;
+    $("pause-screen").hidden = true;
+    renderPowerups();
+  }
+  // The top-bar back button: skip a Snake interlude, toggle pause mid-run, or
+  // (when not playing) return to the menu.
+  function onBack() {
+    if (state.snaking) {
+      endSnake();
+    } else if (state.playing) {
+      if (state.paused) resumeGame();
+      else pauseGame();
+    } else {
+      goHome();
+    }
+  }
+
+  /* ============================================================
+     Snake interlude (every five levels)
+     ============================================================ */
+  const SNAKE_N = 11; // square play grid — keeps the cube look
+  const SNAKE_KEY = "recall.snakeBest";
+  let snake = null;
+  let snakeCells = null;
+
+  const snakeBest = () => {
+    try {
+      return parseInt(localStorage.getItem(SNAKE_KEY) || "0", 10) || 0;
+    } catch {
+      return 0;
+    }
+  };
+  const setSnakeBest = (v) => {
+    try {
+      localStorage.setItem(SNAKE_KEY, String(v));
+    } catch {
+      /* ignore */
+    }
+  };
+
+  function buildSnakeGrid() {
+    const grid = $("snake-grid");
+    grid.style.setProperty("--n", SNAKE_N);
+    grid.innerHTML = "";
+    snakeCells = [];
+    for (let i = 0; i < SNAKE_N * SNAKE_N; i++) {
+      const c = document.createElement("div");
+      c.className = "snake-cell";
+      grid.appendChild(c);
+      snakeCells.push(c);
+    }
+    // Swipe controls — a flick on the grid steers the snake.
+    let start = null;
+    grid.addEventListener("pointerdown", (e) => {
+      start = { x: e.clientX, y: e.clientY };
+    });
+    grid.addEventListener("pointerup", (e) => {
+      if (!start) return;
+      const dx = e.clientX - start.x;
+      const dy = e.clientY - start.y;
+      start = null;
+      if (Math.abs(dx) < 14 && Math.abs(dy) < 14) return;
+      if (Math.abs(dx) > Math.abs(dy)) setSnakeDir(dx > 0 ? 1 : -1, 0);
+      else setSnakeDir(0, dy > 0 ? 1 : -1);
+    });
+  }
+
+  function setSnakeDir(x, y) {
+    if (!snake || !snake.running) return;
+    if (snake.dir.x === -x && snake.dir.y === -y) return; // no 180° reversal
+    snake.nextDir = { x, y };
+  }
+  function snakeKey(e) {
+    const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    const map = {
+      ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0],
+      w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0],
+    };
+    const v = map[k];
+    if (!v) return;
+    e.preventDefault();
+    setSnakeDir(v[0], v[1]);
+  }
+
+  function placeFood() {
+    const occ = new Set(snake.body.map((s) => s.y * SNAKE_N + s.x));
+    const free = [];
+    for (let i = 0; i < SNAKE_N * SNAKE_N; i++) if (!occ.has(i)) free.push(i);
+    if (!free.length) return snakeDie(); // filled the board — a clean win
+    const idx = free[Math.floor(Math.random() * free.length)];
+    snake.food = { x: idx % SNAKE_N, y: Math.floor(idx / SNAKE_N) };
+  }
+
+  function renderSnake() {
+    for (const c of snakeCells) c.className = "snake-cell";
+    snake.body.forEach((s, i) => {
+      const cell = snakeCells[s.y * SNAKE_N + s.x];
+      if (!cell) return;
+      cell.classList.add("on");
+      if (i === snake.body.length - 1) cell.classList.add("head");
+    });
+    if (snake.food) {
+      const f = snakeCells[snake.food.y * SNAKE_N + snake.food.x];
+      if (f) f.classList.add("food");
+    }
+  }
+
+  function snakeTickFn() {
+    const dir = snake.nextDir;
+    snake.dir = dir;
+    const head = snake.body[snake.body.length - 1];
+    const nx = head.x + dir.x;
+    const ny = head.y + dir.y;
+    if (nx < 0 || nx >= SNAKE_N || ny < 0 || ny >= SNAKE_N) return snakeDie();
+    const grow = snake.food && nx === snake.food.x && ny === snake.food.y;
+    // The tail frees up as you move, unless you're growing this step.
+    const collide = (grow ? snake.body : snake.body.slice(1)).some(
+      (s) => s.x === nx && s.y === ny
+    );
+    if (collide) return snakeDie();
+    snake.body.push({ x: nx, y: ny });
+    if (grow) {
+      snake.score += 1;
+      $("snake-score").textContent = snake.score;
+      sfx.correct(snake.score);
+      placeFood();
+      snake.tick = Math.max(85, snake.tick - 6); // speed up a touch each bite
+      restartSnakeLoop();
+    } else {
+      snake.body.shift();
+    }
+    if (snake.running) renderSnake();
+  }
+  function restartSnakeLoop() {
+    if (snake.iv) clearInterval(snake.iv);
+    snake.iv = setInterval(snakeTickFn, snake.tick);
+  }
+
+  function snakeDie() {
+    if (!snake || !snake.running) return;
+    snake.running = false;
+    if (snake.iv) clearInterval(snake.iv);
+    sfx.wrong();
+    const best = Math.max(snakeBest(), snake.score);
+    setSnakeBest(best);
+    $("snake-hint").textContent = `Score ${snake.score} · best ${best}`;
+    $("snake-continue").hidden = false;
+  }
+
+  function startSnake(onDone) {
+    if (!snakeCells) buildSnakeGrid();
+    state.snaking = true;
+    state.locked = true;
+    hidePowerups();
+    if (MODES[state.mode].timed) pauseTimer(); // the bonus doesn't burn Sprint time
+    const mid = Math.floor(SNAKE_N / 2);
+    snake = {
+      body: [
+        { x: mid - 1, y: mid },
+        { x: mid, y: mid },
+        { x: mid + 1, y: mid },
+      ],
+      dir: { x: 1, y: 0 },
+      nextDir: { x: 1, y: 0 },
+      food: null,
+      score: 0,
+      tick: 170,
+      running: true,
+      iv: null,
+      onDone,
+    };
+    placeFood();
+    $("snake-score").textContent = "0";
+    $("snake-kicker").textContent = `Level ${state.level} reached`;
+    $("snake-hint").textContent = "Eat the squares. Swipe or use arrow keys.";
+    $("snake-continue").hidden = true;
+    $("snake-screen").hidden = false;
+    document.addEventListener("keydown", snakeKey);
+    renderSnake();
+    restartSnakeLoop();
+  }
+
+  // Leave the interlude and pick the run back up where it left off.
+  function endSnake() {
+    if (!state.snaking) return;
+    if (snake && snake.iv) clearInterval(snake.iv);
+    document.removeEventListener("keydown", snakeKey);
+    state.snaking = false;
+    $("snake-screen").hidden = true;
+    $("snake-continue").hidden = true;
+    if (MODES[state.mode].timed && state.playing && !state.paused) resumeTimer();
+    const done = snake && snake.onDone;
+    snake = null;
+    if (state.playing && done) done();
+  }
+
+  /* ============================================================
      Level-up checkpoint
      ============================================================ */
   function showCheckpoint(level) {
@@ -985,7 +1213,7 @@
 
     const tick = (now) => {
       if (!state.playing) return;
-      const paused = timerPaused || tabHidden;
+      const paused = timerPaused || tabHidden || state.paused;
       // Clamp dt: while backgrounded rAF stalls, so the first frame back could
       // otherwise carry the entire hidden duration and drain the clock at once.
       const dt = paused ? 0 : Math.min((now - last) / 1000, 0.25);
@@ -1043,6 +1271,8 @@
     state.usedSkip = false;
     state.usedPeek = false;
     state.playing = true;
+    state.paused = false;
+    state.snaking = false;
 
     state.rng = MODES[state.mode].seeded
       ? mulberry32(dailySeed())
@@ -1073,6 +1303,8 @@
     }
     powerupsEl.classList.remove("show", "reserved");
     checkpointEl.hidden = true;
+    $("pause-screen").hidden = true;
+    $("snake-screen").hidden = true;
     renderHUD();
     renderLives();
     closeAllScreens();
@@ -1089,14 +1321,6 @@
     hidePowerups();
     boardEl.classList.remove("interactive");
     sfx.over();
-
-    // Reveal any missed tiles for closure.
-    for (const idx of state.target) {
-      if (!state.found.has(idx)) {
-        const t = tileAt(idx);
-        if (t) t.classList.add("missed");
-      }
-    }
 
     // Record stats.
     const reachedLevel = state.level; // level you were attempting
@@ -1145,7 +1369,37 @@
       prevBest,
     };
 
-    setTimeout(() => showEndScreen(state.lastResult), 900);
+    revealMissed(state.lastResult);
+  }
+
+  // Game-over replay: show the full board you were meant to clear, then mark
+  // which tiles you got (filled) vs. missed (dashed), before the end screen.
+  async function revealMissed(result) {
+    for (const t of boardEl.children)
+      t.classList.remove("wrong", "correct", "missed", "pop", "lit");
+    await wait(260);
+    // The whole pattern lights up — here's what the board was.
+    for (const idx of state.target) {
+      const t = tileAt(idx);
+      if (t) t.classList.add("lit");
+    }
+    sfx.flash();
+    await wait(720);
+    // Now separate the hits from the misses.
+    for (const idx of state.target) {
+      const t = tileAt(idx);
+      if (!t) continue;
+      t.classList.remove("lit");
+      t.classList.add(state.found.has(idx) ? "correct" : "missed");
+    }
+    const missedCount = state.target.size - state.found.size;
+    if (missedCount > 0)
+      promptEl.textContent = `You missed ${missedCount} tile${
+        missedCount > 1 ? "s" : ""
+      }`;
+    await wait(1250);
+    // If the player bailed to the menu mid-replay, don't pop the end screen.
+    if (screens.home.hidden) showEndScreen(result);
   }
 
   /* ============================================================
@@ -1393,6 +1647,14 @@
 
   function goHome() {
     state.playing = false;
+    // Tear down any pause/Snake interlude that was up.
+    if (snake && snake.iv) clearInterval(snake.iv);
+    document.removeEventListener("keydown", snakeKey);
+    snake = null;
+    state.paused = false;
+    state.snaking = false;
+    $("pause-screen").hidden = true;
+    $("snake-screen").hidden = true;
     stopTimer();
     clearTimeout(quoteTimer);
     hudEl.hidden = true;
@@ -1953,7 +2215,11 @@
       }
     }
   });
-  backBtn.addEventListener("click", goHome);
+  backBtn.addEventListener("click", onBack);
+  $("resume-btn").addEventListener("click", resumeGame);
+  $("quit-btn").addEventListener("click", goHome);
+  $("snake-continue").addEventListener("click", endSnake);
+  $("snake-skip").addEventListener("click", endSnake);
 
   $("reminder-toggle").addEventListener("click", onReminderToggle);
   $("test-notif").addEventListener("click", sendTestNotification);

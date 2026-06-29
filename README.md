@@ -40,8 +40,17 @@ No build step, no dependencies.
   ×9. One miss resets it.
 - **Power-ups** — combos earn **Peek** (re-flash the pattern) and **Skip**
   (auto-clear a board). They surface beside the board only when you have them.
-- **Level-up checkpoints** — every five levels, a brief full-screen beat marks
-  the milestone.
+- **Snake interludes** — every five levels (5, 10, 15…) the run pauses for a
+  quick game of Snake on the same cube grid. Swipe or use the arrow keys; eat
+  the squares to grow. It's a pure bonus — your score and lives carry on
+  untouched when you continue, and Sprint's clock is frozen while you play. Your
+  best Snake score is kept locally.
+- **Pause / resume** — the back button mid-run freezes everything (timer, flash,
+  board) behind a Resume / Quit overlay, so an interruption never costs you a
+  run.
+- **Replay what you missed** — on game over the full board you were meant to
+  clear flashes back, then marks which tiles you got versus missed, before the
+  end screen.
 - **Rare color levels** — about one board in twenty breaks the black-and-white
   palette: tiles flash in color and a correct tap pops with a small ring.
   Everything else stays strictly monochrome.
