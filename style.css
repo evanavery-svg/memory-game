@@ -224,6 +224,13 @@ body {
   border: 1px solid var(--tile-edge);
   cursor: pointer;
   padding: 0;
+  /* Respond to a touch the instant it lands: no gesture/double-tap detection,
+     no tap-highlight flash, no long-press selection/callout to swallow taps. */
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
   transition: transform 0.3s var(--ease), background 0.18s var(--ease),
     border-color 0.18s var(--ease);
 }
