@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.16.2";
+  const VERSION = "1.16.3";
 
   /* ============================================================
      Elements
@@ -2602,7 +2602,7 @@
     });
 
     clearTimeout(quoteTimer);
-    quoteTimer = setTimeout(() => floatDown(quote), 700);
+    quoteTimer = setTimeout(() => floatDown(quote), 1100);
   }
 
   function floatDown(quote) {
@@ -2628,7 +2628,7 @@
         { transform: `translateY(${delta}px) scale(1.04)` },
         { transform: "translateY(0) scale(1)" },
       ],
-      { duration: 1600, easing: "cubic-bezier(0.37, 0, 0.63, 1)" }
+      { duration: 2050, easing: "cubic-bezier(0.37, 0, 0.63, 1)" }
     );
     anim.onfinish = reveal;
   }
