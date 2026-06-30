@@ -196,6 +196,29 @@ body {
   display: inline-block;
 }
 
+/* ---------- Next-goal chip ---------- */
+.goal {
+  align-self: center;
+  margin: 4px 0 0;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--tile);
+  border: 1px solid var(--tile-edge);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--muted);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.goal[hidden] {
+  display: none;
+}
+.goal::before {
+  content: "◇ ";
+  opacity: 0.7;
+}
+
 /* ---------- Board ---------- */
 .board-wrap {
   flex: 1;
@@ -258,15 +281,15 @@ body {
 }
 
 .tile.lit {
-  background: var(--ink);
-  border-color: var(--ink);
+  background: var(--accent, var(--ink));
+  border-color: var(--accent, var(--ink));
   box-shadow: 0 10px 26px var(--shadow);
   transform: scale(1.03);
 }
 
 .tile.correct {
-  background: var(--ink);
-  border-color: var(--ink);
+  background: var(--accent, var(--ink));
+  border-color: var(--accent, var(--ink));
 }
 
 .tile.wrong {
@@ -1572,6 +1595,46 @@ body {
 @keyframes snakeFood {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(0.82); }
+}
+
+/* ---------- Board theme swatches ---------- */
+.theme-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 11px;
+  margin: 2px 0 6px;
+}
+.swatch {
+  appearance: none;
+  position: relative;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--sw, var(--ink));
+  border: 1px solid var(--tile-edge);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: transform 0.15s var(--ease);
+}
+.swatch:active {
+  transform: scale(0.9);
+}
+.swatch.selected {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--ink);
+}
+.swatch.locked::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.32);
+}
+.swatch.locked svg {
+  position: relative;
+  z-index: 1;
+  color: #fff;
 }
 
 /* ---------- Backup row ---------- */

@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.16.4";
+  const VERSION = "1.17.0";
 
   /* ============================================================
      Elements
@@ -55,6 +55,7 @@
       adaptive: true,
       contrast: false,
       dailyReminder: false,
+      accent: "mono", // selected board theme (see THEMES)
     },
     readJSON(PREFS_KEY, {})
   );
@@ -75,6 +76,7 @@
       streak: { current: 0, longest: 0, last: null },
       playDays: [], // ["YYYY-MM-DD", ...]
       achievements: [], // unlocked ids
+      themeSeen: [], // board themes already acknowledged (for unlock toasts)
       calib: 0, // adaptive flash-time offset in ms (negative = harder)
       dailyDone: null, // local date key of the last completed Daily run
     },
@@ -85,6 +87,7 @@
   stats.best = Object.assign({ endless: 0, expert: 0, sprint: 0, daily: 0, sequence: 0 }, stats.best);
   if (!Array.isArray(stats.playDays)) stats.playDays = [];
   if (!Array.isArray(stats.achievements)) stats.achievements = [];
+  if (!Array.isArray(stats.themeSeen)) stats.themeSeen = [];
   if (!Array.isArray(stats.recentAcc)) stats.recentAcc = [];
   if (!Array.isArray(stats.playHours) || stats.playHours.length !== 24)
     stats.playHours = Array(24).fill(0);
@@ -275,6 +278,8 @@
       '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4h10v3a5 5 0 01-10 0zM5 4h2v2a3 3 0 01-2-3zM17 4h2a3 3 0 01-2 3zM10 13h4l1 3h-6zM8 18h8v2H8z"/></svg>',
     infinity:
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 12c0-2-1.5-3.5-3-3.5S2 10 2 12s1.5 3.5 3 3.5 3-1.5 4-3.5 2.5-3.5 4-3.5 3 1.5 3 3.5-1.5 3.5-3 3.5-3-1.5-4-3.5"/></svg>',
+    palette:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a9 9 0 100 18c1.1 0 1.8-.9 1.8-1.9 0-1.2-1-1.8-1-2.8 0-.8.7-1.4 1.5-1.4H16a5 5 0 005-5c0-3.9-4-6.9-9-6.9z"/><circle cx="7.5" cy="11.5" r="1" fill="currentColor"/><circle cx="11" cy="7.5" r="1" fill="currentColor"/><circle cx="15" cy="8.5" r="1" fill="currentColor"/></svg>',
   };
 
   // Each achievement carries a goal and a `prog(ctx)` reading so the Stats
@@ -335,7 +340,7 @@
     toastShowing = true;
     $("toast-icon").innerHTML = ICONS[a.icon] || "";
     $("toast-title").textContent = a.name;
-    $("toast-sub").textContent = "Achievement unlocked";
+    $("toast-sub").textContent = a.sub || "Achievement unlocked";
     toastEl.classList.remove("out");
     toastEl.hidden = false;
     sfx.unlock();
@@ -511,6 +516,83 @@
     .addEventListener("change", applyTheme);
 
   /* ============================================================
+     Board themes (cosmetic accent for lit/cleared tiles), unlocked by play.
+     ============================================================ */
+  const THEMES = [
+    { id: "mono", name: "Mono", color: null, need: null },
+    { id: "ocean", name: "Ocean", color: "#0a84ff", need: { test: () => stats.gamesPlayed >= 3, label: "Play 3 games" } },
+    { id: "forest", name: "Forest", color: "#34c759", need: { test: () => stats.bestLevel >= 10, label: "Reach level 10" } },
+    { id: "sunset", name: "Sunset", color: "#ff9500", need: { test: () => stats.bestCombo >= 9, label: "Hit a ×9 combo" } },
+    { id: "grape", name: "Grape", color: "#bf5af2", need: { test: () => stats.streak.longest >= 7, label: "A 7-day streak" } },
+    { id: "rose", name: "Rose", color: "#ff2d55", need: { test: () => stats.gamesPlayed >= 50, label: "Play 50 games" } },
+    { id: "gold", name: "Gold", color: "#ffcc00", need: { test: () => stats.bestLevel >= 20, label: "Reach level 20" } },
+  ];
+  const themeUnlocked = (t) => !t.need || t.need.test();
+  function applyAccent() {
+    let t = THEMES.find((x) => x.id === prefs.accent) || THEMES[0];
+    if (!themeUnlocked(t)) t = THEMES[0]; // fell out of unlock somehow → mono
+    if (t.color) document.documentElement.style.setProperty("--accent", t.color);
+    else document.documentElement.style.removeProperty("--accent");
+  }
+  // Toast any board themes that have newly unlocked (called after a game).
+  function checkThemeUnlocks() {
+    let changed = false;
+    for (const t of THEMES) {
+      if (!t.need || stats.themeSeen.includes(t.id)) continue;
+      if (themeUnlocked(t)) {
+        stats.themeSeen.push(t.id);
+        changed = true;
+        showToast({ name: `${t.name} theme`, icon: "palette", sub: "Board theme unlocked" });
+      }
+    }
+    if (changed) saveStats();
+  }
+
+  const LOCK_SVG =
+    '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
+
+  function setThemeHint(text) {
+    const h = $("theme-hint");
+    if (h) h.textContent = text;
+  }
+  // Build the Settings swatch row: pick an unlocked theme, or tap a locked one
+  // to see what unlocks it.
+  function renderThemes() {
+    const grid = $("theme-grid");
+    if (!grid) return;
+    grid.innerHTML = "";
+    for (const t of THEMES) {
+      const unlocked = themeUnlocked(t);
+      const el = document.createElement("button");
+      el.type = "button";
+      el.className =
+        "swatch" +
+        (prefs.accent === t.id ? " selected" : "") +
+        (unlocked ? "" : " locked");
+      el.style.setProperty("--sw", t.color || "var(--ink)");
+      el.setAttribute(
+        "aria-label",
+        unlocked ? t.name : `${t.name}, locked — ${t.need.label}`
+      );
+      if (!unlocked) el.innerHTML = LOCK_SVG;
+      el.addEventListener("click", () => {
+        if (themeUnlocked(t)) {
+          prefs.accent = t.id;
+          savePrefs();
+          applyAccent();
+          renderThemes();
+          vibrate(8);
+        } else {
+          setThemeHint(`${t.name} — ${t.need.label}`);
+        }
+      });
+      grid.appendChild(el);
+    }
+    const cur = THEMES.find((x) => x.id === prefs.accent) || THEMES[0];
+    setThemeHint(cur.id === "mono" ? "Mono — the classic black & white" : cur.name);
+  }
+
+  /* ============================================================
      Difficulty curve
      ============================================================ */
   // A rare board (5% of levels) breaks the black-and-white palette: tiles flash
@@ -567,6 +649,7 @@
     else primaryEl.textContent = state.level;
     scoreEl.textContent = state.score;
     bestEl.textContent = stats.best[state.mode] || 0;
+    renderGoal();
   }
   function fmtTime(s) {
     s = Math.max(0, Math.ceil(s));
@@ -589,6 +672,42 @@
     } else {
       comboEl.classList.remove("show");
     }
+    renderGoal();
+  }
+  // The nearest locked achievement, judged on live run values where they apply,
+  // so there's always a concrete near-term target on screen.
+  function nextGoal() {
+    const ctx = Object.assign(achContext(), {
+      bestCombo: Math.max(stats.bestCombo, state.bestCombo),
+      bestLevel: Math.max(stats.bestLevel, state.level),
+      bestSingle: Math.max(0, state.score, ...stats.recent, ...Object.values(stats.best)),
+    });
+    const unlocked = new Set(stats.achievements);
+    let best = null;
+    for (const a of ACHIEVEMENTS) {
+      if (unlocked.has(a.id) || a.goal <= 1) continue;
+      const cur = Math.max(0, Math.min(a.goal, a.prog(ctx)));
+      const remaining = a.goal - cur;
+      if (remaining <= 0) continue;
+      if (
+        !best ||
+        remaining < best.remaining ||
+        (remaining === best.remaining && a.goal < best.goal)
+      )
+        best = { name: a.name, remaining, goal: a.goal };
+    }
+    return best;
+  }
+  function renderGoal() {
+    const el = $("goal");
+    if (!el) return;
+    const g = state.playing ? nextGoal() : null;
+    if (!g) {
+      el.hidden = true;
+      return;
+    }
+    el.textContent = `${g.remaining} to ${g.name}`;
+    el.hidden = false;
   }
   function renderLives() {
     if (MODES[state.mode].timed) {
@@ -1441,8 +1560,11 @@
       combo: state.bestCombo,
       isBest: isBest && state.score > 0,
       prevBest,
+      // How many tiles short you were on the board you went out on.
+      missedBy: state.target.size - state.found.size,
     };
 
+    checkThemeUnlocks(); // a fresh board theme is a reward beat
     revealMissed(state.lastResult);
   }
 
@@ -1734,6 +1856,7 @@
     clearTimeout(quoteTimer);
     hudEl.hidden = true;
     comboEl.classList.remove("show");
+    $("goal").hidden = true;
     powerupsEl.classList.remove("show", "reserved");
     backBtn.hidden = true;
     wordmark.hidden = true;
@@ -1752,8 +1875,7 @@
   }
 
   function showEndScreen(r) {
-    $("end-kicker").textContent =
-      r.mode === "sprint" ? "Time’s up" : "Game over";
+    let kicker = r.mode === "sprint" ? "Time’s up" : "Game over";
     $("end-score").textContent = r.score;
     const detail =
       r.mode === "sprint"
@@ -1762,11 +1884,17 @@
     $("end-detail").textContent =
       detail + (r.combo >= 2 ? ` · best ×${r.combo}` : "");
 
-    // Relationship to your personal best for this mode.
+    // Relationship to your personal best for this mode, plus a "so close" hook
+    // that nudges one more run when you only just fell short.
     const name = modeLabel(r.mode);
     const eb = $("end-best");
     const eg = $("end-gap");
     const beat = r.prevBest > 0 && r.score > r.prevBest;
+    const gap = r.prevBest - r.score;
+    // Within ~10% (min 20 pts) of your best counts as a near-miss.
+    const closeToBest =
+      !beat && r.prevBest > 0 && gap > 0 && gap <= Math.max(20, Math.round(r.prevBest * 0.1));
+
     if (beat) {
       eb.textContent = `New ${name} best · +${r.score - r.prevBest}`;
       eb.hidden = false;
@@ -1777,8 +1905,15 @@
       eg.hidden = true;
     } else {
       eb.hidden = true;
-      if (r.prevBest > 0) {
-        const gap = r.prevBest - r.score;
+      if (r.missedBy === 1) {
+        kicker = "So close!";
+        eg.textContent = "One tile from clearing it — go again?";
+        eg.hidden = false;
+      } else if (closeToBest) {
+        kicker = "So close!";
+        eg.textContent = `Just ${gap} from your best — one more run?`;
+        eg.hidden = false;
+      } else if (r.prevBest > 0) {
         eg.textContent =
           gap > 0 ? `${gap} from your ${name} best` : `Matched your ${name} best`;
         eg.hidden = false;
@@ -1787,6 +1922,7 @@
       }
     }
 
+    $("end-kicker").textContent = kicker;
     $("copy-result").hidden = r.mode !== "daily";
     // Daily can't be replayed today, so the primary action returns home.
     $("again-btn").textContent = r.mode === "daily" ? "Back to home" : "Play again";
@@ -2313,6 +2449,7 @@
   $("test-notif").addEventListener("click", sendTestNotification);
   $("open-settings").addEventListener("click", () => {
     refreshReminderHint(); // permission may have changed outside the app
+    renderThemes(); // reflect any themes unlocked since last open
     showScreen("settings");
   });
   $("open-help").addEventListener("click", () => showScreen("help"));
@@ -2357,10 +2494,16 @@
       stats.streak = { current: 0, longest: 0, last: null };
       stats.playDays = [];
       stats.achievements = [];
+      stats.themeSeen = [];
       stats.calib = 0;
       stats.dailyDone = null;
+      // Cosmetic themes re-lock with the stats that earned them.
+      prefs.accent = "mono";
+      savePrefs();
+      applyAccent();
       saveStats();
       renderStatsScreen();
+      renderThemes();
     }
   });
 
@@ -2490,6 +2633,18 @@
     $("app-version").textContent = "v" + VERSION;
     rollSubtitle();
     applyContrast();
+    // Apply the saved board theme, and silently mark already-earned ones as seen
+    // so an existing player isn't toast-spammed on first launch of this version.
+    applyAccent();
+    let seededThemes = false;
+    for (const t of THEMES) {
+      if (t.need && themeUnlocked(t) && !stats.themeSeen.includes(t.id)) {
+        stats.themeSeen.push(t.id);
+        seededThemes = true;
+      }
+    }
+    if (seededThemes) saveStats();
+    renderThemes();
     initReminders();
 
     // Idle board behind the home screen.

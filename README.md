@@ -62,7 +62,15 @@ No build step, no dependencies.
   **this-week strip** of your Daily scores with the best day highlighted.
 - **Achievements** — nine unlockable badges (combos, levels, streaks, a clean
   Sprint…) with a toast when you earn one. Locked badges show a progress bar and
-  how close you are to earning them.
+  how close you are to earning them, and a small **next-goal chip** keeps the
+  nearest one in view while you play (e.g. "2 to Flawless").
+- **Board themes** — an unlockable cosmetic accent for the lit and cleared
+  tiles. Mono (black & white) is always there; **Ocean**, **Forest**, **Sunset**,
+  **Grape**, **Rose** and **Gold** unlock as you rack up games, levels, combos
+  and streaks — long-horizon goals you pick from in Settings, with a toast the
+  moment a new one opens up.
+- **"So close" send-off** — the game-over screen nudges one more run when you
+  only just fell short: "One tile from clearing it" or "Just N from your best".
 - **Gradual difficulty** — the grid grows from 3×3 toward 6×6 and lit tiles climb
   slowly. Flash time scales with how many tiles you must memorize, so harder
   boards get a longer look. Three presets:

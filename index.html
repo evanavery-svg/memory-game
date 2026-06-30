@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/icon-180.png" />
   <link rel="icon" href="icons/icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=1.16.4" />
+  <link rel="stylesheet" href="style.css?v=1.17.0" />
   <title>Recall</title>
 </head>
 <body>
@@ -45,6 +45,9 @@
     </section>
 
     <div class="combo" id="combo" aria-hidden="true"><span id="combo-x">×2</span> combo</div>
+
+    <!-- Nearest locked-achievement goal, shown during play -->
+    <p class="goal" id="goal" hidden aria-live="polite"></p>
 
     <!-- ===== Board ===== -->
     <section class="board-wrap">
@@ -165,6 +168,10 @@
           <span class="row-label">High contrast</span>
           <button class="switch" id="contrast-toggle" role="switch" aria-checked="false" aria-label="High contrast"><span class="knob"></span></button>
         </div>
+
+        <label class="field-label" style="margin-top:6px">Board theme</label>
+        <div class="theme-grid" id="theme-grid" role="group" aria-label="Board theme"></div>
+        <p class="field-hint" id="theme-hint">Mono — the classic black &amp; white</p>
 
         <label class="field-label" style="margin-top:6px">Notifications</label>
         <div class="row-toggle">
@@ -371,6 +378,6 @@
     <canvas id="share-canvas" width="1080" height="1350" hidden></canvas>
   </main>
 
-  <script src="game.js?v=1.16.4"></script>
+  <script src="game.js?v=1.17.0"></script>
 </body>
 </html>
