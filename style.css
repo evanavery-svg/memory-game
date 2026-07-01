@@ -236,7 +236,10 @@ body {
   width: 100%;
   max-width: min(86vw, 360px);
   aspect-ratio: 1 / 1;
-  touch-action: manipulation;
+  /* The gaps are part of the input surface too (taps snap to the nearest
+     tile), so the whole board opts out of browser gesture detection. */
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
   contain: layout style;
 }
 
@@ -254,8 +257,9 @@ body {
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
-  transition: transform 0.3s var(--ease), background 0.18s var(--ease),
-    border-color 0.18s var(--ease);
+  /* Near-instant fill on tap — perceived responsiveness lives under 100ms. */
+  transition: transform 0.3s var(--ease), background 0.06s linear,
+    border-color 0.06s linear;
 }
 
 /* Only the lit tile gets promoted — avoids a compositor layer per tile. */
@@ -290,6 +294,12 @@ body {
 .tile.correct {
   background: var(--accent, var(--ink));
   border-color: var(--accent, var(--ink));
+  /* A quick press-pop so the tile visibly reacts the instant it's tapped. */
+  animation: tilePress 0.22s var(--ease);
+}
+@keyframes tilePress {
+  0% { transform: scale(0.92); }
+  100% { transform: scale(1); }
 }
 
 .tile.wrong {

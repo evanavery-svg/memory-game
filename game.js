@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.17.3";
+  const VERSION = "1.17.4";
 
   /* ============================================================
      Elements
@@ -734,7 +734,10 @@
     }
   }
 
+  let boardSize = 3; // current grid dimension, for gap-snapping input
+
   function buildBoard(size) {
+    boardSize = size;
     boardEl.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
     boardEl.classList.remove("interactive");
     boardEl.innerHTML = "";
@@ -745,12 +748,38 @@
       tile.style.animationDelay = `${i * 10}ms`;
       tile.dataset.index = String(i);
       tile.setAttribute("role", "gridcell");
-      // pointerdown (not click) fires the instant a finger lands — no tap delay.
-      tile.addEventListener("pointerdown", () => onTileClick(i, tile));
       boardEl.appendChild(tile);
     }
   }
   const tileAt = (i) => boardEl.children[i];
+
+  // One delegated pointerdown for the whole board (multi-touch safe: each
+  // finger fires its own event). Landing on a tile counts directly; landing in
+  // the gap between tiles snaps to the nearest one, so the entire board surface
+  // is live — no dead zones during fast, imprecise tapping.
+  boardEl.addEventListener("pointerdown", (e) => {
+    const tile = e.target.closest(".tile");
+    if (tile && tile.parentNode === boardEl) {
+      onTileClick(+tile.dataset.index, tile);
+      return;
+    }
+    if (!boardEl.children.length) return;
+    const rect = boardEl.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const col = clamp(
+      Math.floor(((e.clientX - rect.left) / rect.width) * boardSize),
+      0,
+      boardSize - 1
+    );
+    const row = clamp(
+      Math.floor(((e.clientY - rect.top) / rect.height) * boardSize),
+      0,
+      boardSize - 1
+    );
+    const idx = row * boardSize + col;
+    const t = tileAt(idx);
+    if (t) onTileClick(idx, t);
+  });
 
   // Shuffle 0..total-1 and take `count` — returns an ordered list.
   function sampleList(total, count) {
