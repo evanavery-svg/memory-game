@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.17.2";
+  const VERSION = "1.17.3";
 
   /* ============================================================
      Elements
@@ -962,12 +962,15 @@
       renderLives();
       renderHUD();
       promptEl.textContent = `−${MODES[state.mode].wrongPenalty}s`;
-      state.locked = true;
+      // Don't lock the board here: only the tapped tile itself is inert (its
+      // "wrong" class already blocks re-taps in onTileClick) — other tiles stay
+      // live so a burst of fast taps never gets silently swallowed.
       setTimeout(() => {
         wrongTile.classList.remove("wrong");
-        if (state.playing && state.timeLeft > 0) {
+        // Only restore the tally prompt if the round's still in play — a miss
+        // that lands just before the round/game ends shouldn't stomp that text.
+        if (state.playing && state.timeLeft > 0 && boardEl.classList.contains("interactive")) {
           promptEl.textContent = `Tap ${state.target.size - state.found.size} more`;
-          state.locked = false;
         }
       }, 480);
       return;
@@ -979,14 +982,12 @@
       gameOver();
       return;
     }
-    state.locked = true;
     promptEl.textContent =
       state.lives === 1 ? "Last life — careful" : "Missed one";
     setTimeout(() => {
       wrongTile.classList.remove("wrong");
-      if (state.playing && state.lives > 0) {
+      if (state.playing && state.lives > 0 && boardEl.classList.contains("interactive")) {
         promptEl.textContent = `Tap ${state.target.size - state.found.size} more`;
-        state.locked = false;
       }
     }, 700);
   }
