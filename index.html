@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/icon-180.png" />
   <link rel="icon" href="icons/icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=1.17.4" />
+  <link rel="stylesheet" href="style.css?v=1.18.0" />
   <title>Recall</title>
 </head>
 <body>
@@ -116,6 +116,7 @@
             <button class="seg" data-value="sequence" role="tab">Order</button>
           </div>
           <p class="field-hint" id="mode-hint">Clear boards forever. Three lives.</p>
+          <button class="link-btn archive-link" id="archive-link" hidden>Play a past Daily</button>
         </div>
 
         <button class="cta" id="start-btn">Play</button>
@@ -168,6 +169,11 @@
           <span class="row-label">High contrast</span>
           <button class="switch" id="contrast-toggle" role="switch" aria-checked="false" aria-label="High contrast"><span class="knob"></span></button>
         </div>
+        <div class="row-toggle">
+          <span class="row-label">Focus mode</span>
+          <button class="switch" id="focus-toggle" role="switch" aria-checked="false" aria-label="Focus mode"><span class="knob"></span></button>
+        </div>
+        <p class="field-hint">Hide score and level while you play — just you and the board.</p>
 
         <label class="field-label" style="margin-top:6px">Board theme</label>
         <div class="theme-grid" id="theme-grid" role="group" aria-label="Board theme"></div>
@@ -207,6 +213,10 @@
           <div class="streak-best">
             <span id="streak-longest">0</span>
             <span class="streak-cap">longest</span>
+          </div>
+          <div class="streak-best">
+            <span id="freeze-count">0</span>
+            <span class="streak-cap">❄ freezes</span>
           </div>
         </div>
 
@@ -334,6 +344,16 @@
       </div>
     </section>
 
+    <!-- ===== Daily archive ===== -->
+    <section class="screen" id="archive-screen" hidden>
+      <div class="screen-inner">
+        <h2 class="screen-title">Daily archive</h2>
+        <p class="field-hint" style="margin-bottom:16px">Replay a past Daily for practice — it won’t touch your streak, records, or today’s run.</p>
+        <ul class="best-list" id="archive-list"></ul>
+        <button class="cta ghost" data-close>Done</button>
+      </div>
+    </section>
+
     <!-- ===== Endless: 1 or 2 players? ===== -->
     <section class="screen" id="players-screen" hidden role="dialog" aria-modal="true">
       <div class="screen-inner">
@@ -378,6 +398,6 @@
     <canvas id="share-canvas" width="1080" height="1350" hidden></canvas>
   </main>
 
-  <script src="game.js?v=1.17.4"></script>
+  <script src="game.js?v=1.18.0"></script>
 </body>
 </html>

@@ -60,6 +60,16 @@ No build step, no dependencies.
 - **Daily streaks** — playing on consecutive days builds a streak, with a
   contribution-style calendar of prior days and your longest run, plus a
   **this-week strip** of your Daily scores with the best day highlighted.
+- **Streak freezes** — every 7th consecutive day banks a freeze (hold up to
+  two); miss exactly one day and a freeze is spent automatically to keep the
+  streak alive, with a toast either way.
+- **Daily archive** — from the Daily tab, replay any of the last 14 days'
+  boards for practice. Archive runs never touch your streak, records, or
+  today's one-run lock.
+- **Score juice** — every cleared board floats its "+points" up from the board,
+  scaled by your combo, and the multiplier readout grows as it climbs.
+- **Focus mode** — a Settings toggle that hides score, level and combo during
+  play. Just you and the board.
 - **Achievements** — nine unlockable badges (combos, levels, streaks, a clean
   Sprint…) with a toast when you earn one. Locked badges show a progress bar and
   how close you are to earning them, and a small **next-goal chip** keeps the

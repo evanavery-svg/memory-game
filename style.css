@@ -228,6 +228,22 @@ body {
   justify-content: center;
   gap: 20px;
   min-height: 0;
+  position: relative; /* anchors the floating "+N" score juice */
+}
+
+/* Floating points on a cleared board — drifts up from above the board. */
+.float-pts {
+  position: absolute;
+  left: 50%;
+  top: 8%;
+  transform: translate(-50%, 0);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  pointer-events: none;
+  z-index: 5;
+  opacity: 0;
 }
 
 .board {
@@ -1607,6 +1623,34 @@ body {
 @keyframes snakeFood {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(0.82); }
+}
+
+/* ---------- Focus mode ---------- */
+/* Hide the numbers, keep the layout: HUD/combo keep their space (no board
+   shift), the goal chip and score juice simply don't appear. */
+:root[data-focus] .hud,
+:root[data-focus] .combo.show {
+  visibility: hidden;
+}
+:root[data-focus] .goal {
+  display: none;
+}
+
+/* ---------- Daily archive ---------- */
+.archive-link {
+  display: block;
+  margin: 2px auto 0;
+  font-size: 13.5px;
+}
+.best-list li.archive-day {
+  cursor: pointer;
+  border-radius: 8px;
+  padding-left: 8px;
+  padding-right: 8px;
+  transition: background 0.15s var(--ease);
+}
+.best-list li.archive-day:active {
+  background: var(--tile);
 }
 
 /* ---------- Board theme swatches ---------- */

@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.17.4";
+  const VERSION = "1.18.0";
 
   /* ============================================================
      Elements
@@ -35,6 +35,7 @@
     settings: $("settings-screen"),
     stats: $("stats-screen"),
     help: $("help-screen"),
+    archive: $("archive-screen"),
     end: $("end-screen"),
   };
 
@@ -56,6 +57,7 @@
       contrast: false,
       dailyReminder: false,
       accent: "mono", // selected board theme (see THEMES)
+      focus: false, // hide score/level/combo during play
     },
     readJSON(PREFS_KEY, {})
   );
@@ -74,6 +76,7 @@
       modeAgg: {}, // per-mode { runs, levelSum } for average-level stats
       dailyScores: {}, // { "YYYY-MM-DD": score } for the Daily weekly strip
       streak: { current: 0, longest: 0, last: null },
+      freezes: 0, // streak freezes held (earned every 7 streak days, max 2)
       playDays: [], // ["YYYY-MM-DD", ...]
       achievements: [], // unlocked ids
       themesUnlocked: [], // earned board themes (mono is always available)
@@ -88,6 +91,7 @@
   if (!Array.isArray(stats.playDays)) stats.playDays = [];
   if (!Array.isArray(stats.achievements)) stats.achievements = [];
   if (!Array.isArray(stats.themesUnlocked)) stats.themesUnlocked = [];
+  if (typeof stats.freezes !== "number") stats.freezes = 0;
   if (!Array.isArray(stats.recentAcc)) stats.recentAcc = [];
   if (!Array.isArray(stats.playHours) || stats.playHours.length !== 24)
     stats.playHours = Array(24).fill(0);
@@ -207,6 +211,9 @@
     const d = new Date();
     return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
   }
+  // Seed for an arbitrary local date key ("YYYY-MM-DD" → yyyymmdd), matching
+  // dailySeed()'s format so an archived day replays that day's exact boards.
+  const seedFromKey = (key) => parseInt(key.replace(/-/g, ""), 10);
 
   /* ============================================================
      Dates & streaks
@@ -231,6 +238,17 @@
       return todayKey();
     }
   }
+  // Short label for an archived date key, e.g. "June 27".
+  function archiveDateLabel(key) {
+    try {
+      return new Date(key + "T00:00:00").toLocaleDateString(undefined, {
+        month: "long",
+        day: "numeric",
+      });
+    } catch {
+      return key;
+    }
+  }
   // Daily is one-and-done per local calendar day; it unlocks again at midnight
   // because todayKey() rolls over to a new date.
   const dailyDoneToday = () => stats.dailyDone === todayKey();
@@ -241,18 +259,40 @@
   }
 
   // Called when a game begins — records today as played and advances the streak.
+  // A held streak freeze bridges exactly one missed day instead of resetting.
   function registerPlay() {
     const today = todayKey();
     const s = stats.streak;
+    let advanced = false;
     if (s.last === today) {
       // already counted today
     } else if (s.last && daysBetween(s.last, today) === 1) {
       s.current += 1; // consecutive day
+      advanced = true;
+    } else if (s.last && daysBetween(s.last, today) === 2 && stats.freezes > 0) {
+      // Missed exactly one day with a freeze in hand — spend it, streak lives.
+      stats.freezes -= 1;
+      s.current += 1;
+      advanced = true;
+      showToast({
+        name: "Streak freeze used",
+        icon: "flake",
+        sub: `Saved your ${s.current}-day streak`,
+      });
     } else {
       s.current = 1; // first play, or a gap broke the streak
     }
     s.last = today;
     s.longest = Math.max(s.longest, s.current);
+    // Every 7th consecutive day banks a freeze (hold at most 2).
+    if (advanced && s.current % 7 === 0 && stats.freezes < 2) {
+      stats.freezes += 1;
+      showToast({
+        name: "Streak freeze earned",
+        icon: "flake",
+        sub: "Covers one missed day",
+      });
+    }
     if (!stats.playDays.includes(today)) stats.playDays.push(today);
     // Keep the play-day log bounded (~1 year).
     if (stats.playDays.length > 400) stats.playDays = stats.playDays.slice(-400);
@@ -280,6 +320,8 @@
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 12c0-2-1.5-3.5-3-3.5S2 10 2 12s1.5 3.5 3 3.5 3-1.5 4-3.5 2.5-3.5 4-3.5 3 1.5 3 3.5-1.5 3.5-3 3.5-3-1.5-4-3.5"/></svg>',
     palette:
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a9 9 0 100 18c1.1 0 1.8-.9 1.8-1.9 0-1.2-1-1.8-1-2.8 0-.8.7-1.4 1.5-1.4H16a5 5 0 005-5c0-3.9-4-6.9-9-6.9z"/><circle cx="7.5" cy="11.5" r="1" fill="currentColor"/><circle cx="11" cy="7.5" r="1" fill="currentColor"/><circle cx="15" cy="8.5" r="1" fill="currentColor"/></svg>',
+    flake:
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v18M5 7.5l14 9M19 7.5l-14 9M12 3l-2.2 2.2M12 3l2.2 2.2M12 21l-2.2-2.2M12 21l2.2-2.2"/></svg>',
   };
 
   // Each achievement carries a goal and a `prog(ctx)` reading so the Stats
@@ -665,10 +707,31 @@
       { duration: 500, easing: "cubic-bezier(0.34, 1.56, 0.64, 1)" }
     );
   }
+  // Score juice: float "+N" up from the board on every clear. Bigger combos get
+  // slightly bigger type, so a hot streak visibly escalates.
+  function floatPoints(gained, combo) {
+    if (prefersReducedMotion() || prefs.focus) return;
+    const el = document.createElement("span");
+    el.className = "float-pts";
+    el.textContent = `+${gained}`;
+    el.style.fontSize = `${Math.min(22 + combo * 2, 40)}px`;
+    boardEl.parentNode.appendChild(el);
+    const anim = el.animate(
+      [
+        { opacity: 0, transform: "translate(-50%, 0) scale(0.8)" },
+        { opacity: 1, transform: "translate(-50%, -30px) scale(1)", offset: 0.25 },
+        { opacity: 0, transform: "translate(-50%, -74px) scale(1)" },
+      ],
+      { duration: 950, easing: "cubic-bezier(0.22, 1, 0.36, 1)" }
+    );
+    anim.onfinish = () => el.remove();
+  }
   function renderCombo() {
     if (state.combo >= 2) {
       comboEl.classList.add("show");
       comboX.textContent = "×" + state.combo;
+      // The multiplier grows with the streak — ×9 should look hot.
+      comboX.style.fontSize = `${Math.min(12 + state.combo * 1.2, 23)}px`;
       comboX.animate(
         [{ transform: "scale(1)" }, { transform: "scale(1.5)" }, { transform: "scale(1)" }],
         { duration: 450, easing: "cubic-bezier(0.34, 1.56, 0.64, 1)" }
@@ -927,6 +990,7 @@
     const base = state.target.size * 10 + state.level * 5;
     const gained = Math.round(base * state.combo);
     state.score += gained;
+    floatPoints(gained, state.combo);
 
     if (MODES[state.mode].timed && perfect) state.timeLeft += 1.5;
 
@@ -1453,16 +1517,24 @@
   /* ============================================================
      Game lifecycle
      ============================================================ */
+  // When set, the next Daily run replays this past date instead of today —
+  // practice only: no lock, no streak/record effects beyond a normal game.
+  let archiveDate = null;
+
   function newGame(modeOverride) {
     ac(); // unlock audio
     // Two-player is launched as an override (Endless → 2 Players); event
     // handlers pass an Event here, so only honour a real string.
     const mode = typeof modeOverride === "string" ? modeOverride : prefs.mode;
+    if (mode !== "daily") archiveDate = null; // stale picks never leak across modes
+    const archive = mode === "daily" ? archiveDate : null;
     // Daily is locked to one run per day — already played today? Bounce home.
-    if (mode === "daily" && dailyDoneToday()) {
+    // (Archive replays are practice and never locked.)
+    if (mode === "daily" && !archive && dailyDoneToday()) {
       goHome();
       return;
     }
+    state.archive = archive;
     state.mode = mode;
     state.diff = prefs.difficulty;
     // Expert skips the gentle early boards and drops you in deep.
@@ -1483,11 +1555,12 @@
     state.snaking = false;
 
     state.rng = MODES[state.mode].seeded
-      ? mulberry32(dailySeed())
+      ? mulberry32(state.archive ? seedFromKey(state.archive) : dailySeed())
       : Math.random;
 
     // Daily locks the moment it starts — one attempt per day, no resuming.
-    if (state.mode === "daily") {
+    // Archive replays don't lock anything.
+    if (state.mode === "daily" && !state.archive) {
       stats.dailyDone = todayKey();
       // Let the reminder worker know today's Daily is handled.
       metaSet("dailyPlayed", todayKey());
@@ -1502,9 +1575,11 @@
     comboEl.classList.remove("show");
     backBtn.hidden = false;
     wordmark.hidden = false;
-    // Daily shows today's date under the wordmark; other modes don't.
+    // Daily shows its date under the wordmark; other modes don't.
     if (state.mode === "daily") {
-      dailyDateEl.textContent = dailyDateLabel();
+      dailyDateEl.textContent = state.archive
+        ? `${archiveDateLabel(state.archive)} · Archive`
+        : dailyDateLabel();
       dailyDateEl.hidden = false;
     } else {
       dailyDateEl.hidden = true;
@@ -1556,9 +1631,10 @@
     stats.correctTaps += state.hits;
     stats.bestLevel = Math.max(stats.bestLevel, reachedLevel);
     stats.bestCombo = Math.max(stats.bestCombo, state.bestCombo);
+    const practice = !!state.archive; // archive replay — no Daily records
     const prevBest = stats.best[state.mode] || 0; // best before this run
-    const isBest = state.score >= prevBest;
-    stats.best[state.mode] = Math.max(prevBest, state.score);
+    const isBest = !practice && state.score >= prevBest;
+    if (!practice) stats.best[state.mode] = Math.max(prevBest, state.score);
     stats.recent.push(state.score);
     if (stats.recent.length > 16) stats.recent = stats.recent.slice(-16);
 
@@ -1578,8 +1654,9 @@
     agg.runs += 1;
     agg.levelSum += reachedLevel;
 
-    // Daily keeps a per-day score for the weekly strip.
-    if (state.mode === "daily") stats.dailyScores[todayKey()] = state.score;
+    // Daily keeps a per-day score for the weekly strip (real runs only).
+    if (state.mode === "daily" && !practice)
+      stats.dailyScores[todayKey()] = state.score;
 
     // A clean Sprint = at least one tap and zero wrong taps.
     const cleanSprint =
@@ -1594,6 +1671,7 @@
       combo: state.bestCombo,
       isBest: isBest && state.score > 0,
       prevBest,
+      archive: state.archive,
       // How many tiles short you were on the board you went out on.
       missedBy: state.target.size - state.found.size,
     };
@@ -1883,6 +1961,8 @@
     snake = null;
     state.snaking = false;
     state.vs = null;
+    state.archive = null;
+    archiveDate = null;
     $("snake-screen").hidden = true;
     $("versus-screen").hidden = true;
     $("players-screen").hidden = true;
@@ -1939,8 +2019,8 @@
       eg.hidden = true;
     } else {
       eb.hidden = true;
-      // Daily is one run per day, so never invite "go again".
-      const daily = r.mode === "daily";
+      // Daily is one run per day, so never invite "go again" (archive can).
+      const daily = r.mode === "daily" && !r.archive;
       if (r.missedBy === 1) {
         kicker = "So close!";
         eg.textContent = daily
@@ -1963,9 +2043,11 @@
     }
 
     $("end-kicker").textContent = kicker;
-    $("copy-result").hidden = r.mode !== "daily";
-    // Daily can't be replayed today, so the primary action returns home.
-    $("again-btn").textContent = r.mode === "daily" ? "Back to home" : "Play again";
+    // The share string always describes *today's* Daily — hide it on archive runs.
+    $("copy-result").hidden = r.mode !== "daily" || !!r.archive;
+    // Daily can't be replayed today (archive replays can), so home is primary.
+    $("again-btn").textContent =
+      r.mode === "daily" && !r.archive ? "Back to home" : "Play again";
     showScreen("end");
   }
 
@@ -2002,6 +2084,7 @@
       last && daysBetween(last, todayKey()) <= 1 ? stats.streak.current : 0;
     $("streak-current").textContent = live;
     $("streak-longest").textContent = stats.streak.longest;
+    $("freeze-count").textContent = stats.freezes;
     renderCalendar();
     renderDailyWeek();
     renderAchievements();
@@ -2394,6 +2477,10 @@
   function applyContrast() {
     document.documentElement.toggleAttribute("data-contrast", !!prefs.contrast);
   }
+  // Focus mode: hide score/level/combo/goal during play for a calmer run.
+  function applyFocus() {
+    document.documentElement.toggleAttribute("data-focus", !!prefs.focus);
+  }
 
   // The home subtitle is usually "Memory, beautifully simple." — but every so
   // often it carries a little message. ♥
@@ -2415,6 +2502,37 @@
     const play = $("start-btn");
     play.disabled = dailyLocked;
     play.textContent = dailyLocked ? "Come back tomorrow" : "Play";
+    // The archive entry point only makes sense on the Daily tab.
+    $("archive-link").hidden = prefs.mode !== "daily";
+  }
+
+  // Build the archive list: the last 14 days (yesterday back), with the score
+  // you posted on days you actually played that Daily.
+  function renderArchive() {
+    const list = $("archive-list");
+    list.innerHTML = "";
+    const today = new Date();
+    for (let i = 1; i <= 14; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const key = dateKey(d);
+      const played = Object.prototype.hasOwnProperty.call(stats.dailyScores, key);
+      const li = document.createElement("li");
+      li.className = "archive-day";
+      const label = d.toLocaleDateString(undefined, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      });
+      li.innerHTML =
+        `<span>${label}</span>` +
+        `<b>${played ? stats.dailyScores[key] : "—"}</b>`;
+      li.addEventListener("click", () => {
+        archiveDate = key;
+        newGame("daily");
+      });
+      list.appendChild(li);
+    }
   }
 
   /* ============================================================
@@ -2434,7 +2552,12 @@
   initSwitch("haptics-toggle", "haptics");
   initSwitch("adaptive-toggle", "adaptive");
   initSwitch("contrast-toggle", "contrast", applyContrast);
+  initSwitch("focus-toggle", "focus", applyFocus);
 
+  $("archive-link").addEventListener("click", () => {
+    renderArchive();
+    showScreen("archive");
+  });
   $("play-btn").addEventListener("click", enterModes);
   // Endless asks 1P or 2P first; the other modes start straight away.
   $("start-btn").addEventListener("click", () => {
@@ -2532,6 +2655,7 @@
       stats.modeAgg = {};
       stats.dailyScores = {};
       stats.streak = { current: 0, longest: 0, last: null };
+      stats.freezes = 0;
       stats.playDays = [];
       stats.achievements = [];
       stats.themesUnlocked = [];
@@ -2673,6 +2797,7 @@
     $("app-version").textContent = "v" + VERSION;
     rollSubtitle();
     applyContrast();
+    applyFocus();
     // Everyone starts with only Mono; colored themes are earned through play.
     applyAccent();
     renderThemes();
