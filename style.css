@@ -804,10 +804,12 @@ body {
   animation: screenIn 0.7s var(--ease);
 }
 
-/* Quote-only phase: hide the bar, brand and copyright — the quote stands alone. */
+/* Quote-only phase: hide the bar, brand and copyright — the quote stands alone.
+   pointer-events:none so the still-invisible buttons can't be tapped through. */
 .modes-screen.quoting .modes-inner {
   animation: none;
   opacity: 0;
+  pointer-events: none;
 }
 .modes-screen.quoting .mode-brand,
 .modes-screen.quoting .modes-copy {
