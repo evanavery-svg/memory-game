@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.17.0";
+  const VERSION = "1.17.1";
 
   /* ============================================================
      Elements
@@ -76,7 +76,7 @@
       streak: { current: 0, longest: 0, last: null },
       playDays: [], // ["YYYY-MM-DD", ...]
       achievements: [], // unlocked ids
-      themeSeen: [], // board themes already acknowledged (for unlock toasts)
+      themesUnlocked: [], // earned board themes (mono is always available)
       calib: 0, // adaptive flash-time offset in ms (negative = harder)
       dailyDone: null, // local date key of the last completed Daily run
     },
@@ -87,7 +87,7 @@
   stats.best = Object.assign({ endless: 0, expert: 0, sprint: 0, daily: 0, sequence: 0 }, stats.best);
   if (!Array.isArray(stats.playDays)) stats.playDays = [];
   if (!Array.isArray(stats.achievements)) stats.achievements = [];
-  if (!Array.isArray(stats.themeSeen)) stats.themeSeen = [];
+  if (!Array.isArray(stats.themesUnlocked)) stats.themesUnlocked = [];
   if (!Array.isArray(stats.recentAcc)) stats.recentAcc = [];
   if (!Array.isArray(stats.playHours) || stats.playHours.length !== 24)
     stats.playHours = Array(24).fill(0);
@@ -527,25 +527,29 @@
     { id: "rose", name: "Rose", color: "#ff2d55", need: { test: () => stats.gamesPlayed >= 50, label: "Play 50 games" } },
     { id: "gold", name: "Gold", color: "#ffcc00", need: { test: () => stats.bestLevel >= 20, label: "Reach level 20" } },
   ];
-  const themeUnlocked = (t) => !t.need || t.need.test();
+  // Mono is always available; a colored theme counts as unlocked only once it
+  // has been *earned* (added to stats.themesUnlocked) — never derived on the fly
+  // from accumulated stats, so everyone starts with only Mono.
+  const themeUnlocked = (t) => !t.need || stats.themesUnlocked.includes(t.id);
+  const themeEligible = (t) => !t.need || t.need.test();
   function applyAccent() {
     let t = THEMES.find((x) => x.id === prefs.accent) || THEMES[0];
-    if (!themeUnlocked(t)) t = THEMES[0]; // fell out of unlock somehow → mono
+    if (!themeUnlocked(t)) t = THEMES[0]; // not earned (yet) → fall back to mono
     if (t.color) document.documentElement.style.setProperty("--accent", t.color);
     else document.documentElement.style.removeProperty("--accent");
   }
-  // Toast any board themes that have newly unlocked (called after a game).
+  // After a game, earn at most one newly-eligible theme — a steady drip rather
+  // than a burst — and toast it.
   function checkThemeUnlocks() {
-    let changed = false;
     for (const t of THEMES) {
-      if (!t.need || stats.themeSeen.includes(t.id)) continue;
-      if (themeUnlocked(t)) {
-        stats.themeSeen.push(t.id);
-        changed = true;
+      if (!t.need || stats.themesUnlocked.includes(t.id)) continue;
+      if (themeEligible(t)) {
+        stats.themesUnlocked.push(t.id);
+        saveStats();
         showToast({ name: `${t.name} theme`, icon: "palette", sub: "Board theme unlocked" });
+        return;
       }
     }
-    if (changed) saveStats();
   }
 
   const LOCK_SVG =
@@ -1905,13 +1909,19 @@
       eg.hidden = true;
     } else {
       eb.hidden = true;
+      // Daily is one run per day, so never invite "go again".
+      const daily = r.mode === "daily";
       if (r.missedBy === 1) {
         kicker = "So close!";
-        eg.textContent = "One tile from clearing it — go again?";
+        eg.textContent = daily
+          ? "One tile from clearing today’s board."
+          : "One tile from clearing it — go again?";
         eg.hidden = false;
       } else if (closeToBest) {
         kicker = "So close!";
-        eg.textContent = `Just ${gap} from your best — one more run?`;
+        eg.textContent = daily
+          ? `Just ${gap} from your Daily best.`
+          : `Just ${gap} from your best — one more run?`;
         eg.hidden = false;
       } else if (r.prevBest > 0) {
         eg.textContent =
@@ -2494,7 +2504,7 @@
       stats.streak = { current: 0, longest: 0, last: null };
       stats.playDays = [];
       stats.achievements = [];
-      stats.themeSeen = [];
+      stats.themesUnlocked = [];
       stats.calib = 0;
       stats.dailyDone = null;
       // Cosmetic themes re-lock with the stats that earned them.
@@ -2633,17 +2643,8 @@
     $("app-version").textContent = "v" + VERSION;
     rollSubtitle();
     applyContrast();
-    // Apply the saved board theme, and silently mark already-earned ones as seen
-    // so an existing player isn't toast-spammed on first launch of this version.
+    // Everyone starts with only Mono; colored themes are earned through play.
     applyAccent();
-    let seededThemes = false;
-    for (const t of THEMES) {
-      if (t.need && themeUnlocked(t) && !stats.themeSeen.includes(t.id)) {
-        stats.themeSeen.push(t.id);
-        seededThemes = true;
-      }
-    }
-    if (seededThemes) saveStats();
     renderThemes();
     initReminders();
 
