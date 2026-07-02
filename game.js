@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.18.0";
+  const VERSION = "1.18.1";
 
   /* ============================================================
      Elements
@@ -2098,7 +2098,8 @@
   function renderBestList() {
     const list = $("best-list");
     if (!list) return;
-    const rows = ["endless", "expert", "sprint", "daily", "sequence"];
+    // Only modes reachable from the current UI (Expert/Sprint are hidden).
+    const rows = ["endless", "daily", "sequence"];
     list.innerHTML = rows
       .map((key) => {
         const best = stats.best[key] || 0;
