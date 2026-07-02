@@ -181,7 +181,9 @@ body {
   font-weight: 600;
   letter-spacing: 0.02em;
   color: var(--muted);
-  height: 18px;
+  /* Tall enough for the grown ×9 multiplier so it never crowds the goal chip. */
+  height: 24px;
+  line-height: 24px;
   margin-top: 2px;
   flex-shrink: 0;
   /* Always occupy space — only the text fades, so the board never shifts. */
@@ -279,10 +281,6 @@ body {
 }
 
 /* Only the lit tile gets promoted — avoids a compositor layer per tile. */
-.tile.lit {
-  will-change: transform;
-}
-
 .tile.enter {
   animation: tileIn 0.5s var(--ease) backwards;
 }
@@ -305,6 +303,8 @@ body {
   border-color: var(--accent, var(--ink));
   box-shadow: 0 10px 26px var(--shadow);
   transform: scale(1.03);
+  /* Only the lit tile gets promoted — avoids a compositor layer per tile. */
+  will-change: transform;
 }
 
 .tile.correct {
@@ -1166,52 +1166,6 @@ body {
 @keyframes powerIn {
   from { opacity: 0; transform: scale(0.7) translateY(6px); }
   to { opacity: 1; transform: scale(1) translateY(0); }
-}
-
-/* ============================================================
-   Level-up checkpoint
-   ============================================================ */
-.checkpoint {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  z-index: 15;
-  pointer-events: none;
-  background: var(--scrim);
-  backdrop-filter: saturate(180%) blur(8px);
-  -webkit-backdrop-filter: saturate(180%) blur(8px);
-  animation: cpFade 1.3s var(--ease) forwards;
-}
-.checkpoint[hidden] {
-  display: none;
-}
-.checkpoint-num {
-  font-size: 110px;
-  font-weight: 700;
-  letter-spacing: -0.05em;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-  animation: cpPop 0.5s var(--spring);
-}
-.checkpoint-label {
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-@keyframes cpPop {
-  0% { transform: scale(0.5); opacity: 0; }
-  60% { transform: scale(1.08); }
-  100% { transform: scale(1); opacity: 1; }
-}
-@keyframes cpFade {
-  0%, 70% { opacity: 1; }
-  100% { opacity: 0; }
 }
 
 /* ============================================================

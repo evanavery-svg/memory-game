@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.18.1";
+  const VERSION = "1.18.2";
 
   /* ============================================================
      Elements
@@ -26,7 +26,6 @@
   const skipBtn = $("power-skip");
   const peekN = $("peek-n");
   const skipN = $("skip-n");
-  const checkpointEl = $("checkpoint");
   const toastEl = $("toast");
 
   const screens = {
@@ -107,11 +106,21 @@
       return fallback;
     }
   }
+  // Storage writes can throw (private browsing, quota) — the game must keep
+  // running on in-memory state either way.
   function savePrefs() {
-    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+    try {
+      localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+    } catch {
+      /* play on without persistence */
+    }
   }
   function saveStats() {
-    localStorage.setItem(STATS_KEY, JSON.stringify(stats));
+    try {
+      localStorage.setItem(STATS_KEY, JSON.stringify(stats));
+    } catch {
+      /* play on without persistence */
+    }
   }
 
   /* ============================================================
@@ -167,7 +176,6 @@
   /* ============================================================
      State
      ============================================================ */
-  const MAX_LIVES_DISPLAY = 6;
   const state = {
     mode: prefs.mode,
     diff: prefs.difficulty,
@@ -517,12 +525,6 @@
       tone(659.25, 0.1, { gain: 0.05, body: true });
       setTimeout(() => tone(987.77, 0.16, { gain: 0.05, body: true }), 70);
     },
-    checkpoint: () => {
-      tone(523.25, 0.1, { gain: 0.05, body: true });
-      setTimeout(() => tone(784, 0.1, { gain: 0.05, body: true }), 80);
-      setTimeout(() => tone(1046.5, 0.22, { gain: 0.05, body: true }), 160);
-      vibrate([12, 40, 12]);
-    },
     // A power-up lands: a soft two-note lift, a touch quieter than a clear.
     earn: () => {
       tone(784, 0.1, { gain: 0.045, body: true });
@@ -811,6 +813,10 @@
       tile.style.animationDelay = `${i * 10}ms`;
       tile.dataset.index = String(i);
       tile.setAttribute("role", "gridcell");
+      tile.setAttribute(
+        "aria-label",
+        `Tile, row ${Math.floor(i / size) + 1}, column ${(i % size) + 1}`
+      );
       boardEl.appendChild(tile);
     }
   }
@@ -821,6 +827,7 @@
   // the gap between tiles snaps to the nearest one, so the entire board surface
   // is live — no dead zones during fast, imprecise tapping.
   boardEl.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return; // left-click only
     const tile = e.target.closest(".tile");
     if (tile && tile.parentNode === boardEl) {
       onTileClick(+tile.dataset.index, tile);
@@ -999,15 +1006,18 @@
     state.usedSkip = false;
     state.usedPeek = false;
 
-    if (state.score > (stats.best[state.mode] || 0)) {
-      stats.best[state.mode] = state.score;
-      bump(bestEl);
+    // Live records so achievements can pop mid-run. Two-player rounds stay out
+    // of the single-player books entirely (another person shouldn't set your
+    // bests); archive replays count as skill but never as a mode record.
+    if (state.mode !== "versus") {
+      if (!state.archive && state.score > (stats.best[state.mode] || 0)) {
+        stats.best[state.mode] = state.score;
+        bump(bestEl);
+      }
+      stats.bestCombo = Math.max(stats.bestCombo, state.bestCombo);
+      stats.bestLevel = Math.max(stats.bestLevel, state.level);
+      checkAchievements({ bestSingle: state.score });
     }
-
-    // Live stats so achievements can pop mid-run.
-    stats.bestCombo = Math.max(stats.bestCombo, state.bestCombo);
-    stats.bestLevel = Math.max(stats.bestLevel, state.level);
-    checkAchievements({ bestSingle: state.score });
 
     renderHUD();
     bump(scoreEl);
@@ -1224,12 +1234,14 @@
       grid.appendChild(c);
       snakeCells.push(c);
     }
-    // Swipe controls — a flick on the grid steers the snake.
+    // Swipe controls — a flick starting on the grid steers the snake. The
+    // release is caught window-wide, since a fast swipe often ends past the
+    // small grid's edge.
     let start = null;
     grid.addEventListener("pointerdown", (e) => {
       start = { x: e.clientX, y: e.clientY };
     });
-    grid.addEventListener("pointerup", (e) => {
+    window.addEventListener("pointerup", (e) => {
       if (!start) return;
       const dx = e.clientX - start.x;
       const dy = e.clientY - start.y;
@@ -2723,14 +2735,17 @@
     reader.readAsText(file);
   });
 
-  // Keyboard: space/enter starts from home or end screen — but only when no
-  // control is focused, so it doesn't fire alongside a button/link/segment
-  // activation (which would otherwise start two games or open a screen at once).
+  // Keyboard: space/enter mirrors the visible primary action — Play on the
+  // landing screen, Play again on the end screen. Only when no control is
+  // focused, so it doesn't fire alongside a button/link/segment activation.
   document.addEventListener("keydown", (e) => {
     if (e.key !== " " && e.key !== "Enter") return;
     if (e.target.closest("button, a, input, select, textarea, [role='switch'], [role='tab']"))
       return;
-    if (!screens.home.hidden || !screens.end.hidden) {
+    if (!screens.home.hidden) {
+      e.preventDefault();
+      enterModes();
+    } else if (!screens.end.hidden) {
       e.preventDefault();
       newGame();
     }
@@ -2890,7 +2905,8 @@
   // briefly, then let it float down. The mode bar only appears once the float
   // has fully completed.
   function enterModes() {
-    if (state.playing) return;
+    // Ignore a double-tap on Play (or Enter) once the transition is underway.
+    if (state.playing || !screens.modes.hidden) return;
     const screen = screens.modes;
     const quote = $("modes-quote");
     paintQuote();

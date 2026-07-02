@@ -1,13 +1,13 @@
 /* Recall service worker — offline-first caching */
-const CACHE = "recall-v51";
+const CACHE = "recall-v52";
 // A separate cache the page and worker both use as a tiny key/value store
 // (the worker can't read localStorage). Kept across activations.
 const META = "recall-meta";
 const ASSETS = [
   "./",
   "./index.html",
-  "./style.css?v=1.18.1",
-  "./game.js?v=1.18.1",
+  "./style.css?v=1.18.2",
+  "./game.js?v=1.18.2",
   "./manifest.webmanifest",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
@@ -36,20 +36,28 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-// Network-first: fetch fresh, update the cache, fall back to cache when offline.
+// Network-first with a short timeout: fresh content when the network is
+// healthy, the cached copy after ~3.5s when it's flaky (the fetch keeps going
+// in the background and refreshes the cache for next launch), and an instant
+// cache fallback when fully offline.
 function networkFirst(request, fallbackKey) {
   const key = fallbackKey || request;
-  return fetch(request)
-    .then((res) => {
-      if (res && res.ok && res.type === "basic") {
-        const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put(key, copy));
-      }
-      return res;
-    })
-    .catch(() =>
-      caches.match(key).then((cached) => cached || caches.match("./index.html"))
-    );
+  const fromNetwork = fetch(request).then((res) => {
+    if (res && res.ok && res.type === "basic") {
+      const copy = res.clone();
+      caches.open(CACHE).then((c) => c.put(key, copy));
+    }
+    return res;
+  });
+  const fromCache = () =>
+    caches.match(key).then((cached) => cached || caches.match("./index.html"));
+  const timeout = new Promise((resolve) =>
+    setTimeout(() => resolve(fromCache()), 3500)
+  );
+  return Promise.race([fromNetwork.catch(fromCache), timeout]).then(
+    // A cache miss on timeout (nothing to serve yet) waits the network out.
+    (res) => res || fromNetwork.catch(fromCache)
+  );
 }
 
 // Cache-first: serve from cache, otherwise fetch and store.

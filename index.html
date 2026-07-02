@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/icon-180.png" />
   <link rel="icon" href="icons/icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=1.18.1" />
+  <link rel="stylesheet" href="style.css?v=1.18.2" />
   <title>Recall</title>
 </head>
 <body>
@@ -46,8 +46,9 @@
 
     <div class="combo" id="combo" aria-hidden="true"><span id="combo-x">×2</span> combo</div>
 
-    <!-- Nearest locked-achievement goal, shown during play -->
-    <p class="goal" id="goal" hidden aria-live="polite"></p>
+    <!-- Nearest locked-achievement goal, shown during play. Deliberately not a
+         live region — announcing it every round would drown out the prompt. -->
+    <p class="goal" id="goal" hidden></p>
 
     <!-- ===== Board ===== -->
     <section class="board-wrap">
@@ -68,12 +69,6 @@
     </div>
 
     <p class="prompt" id="prompt" role="status" aria-live="polite">Memorize the tiles.</p>
-
-    <!-- Level-up checkpoint beat -->
-    <div class="checkpoint" id="checkpoint" hidden aria-hidden="true">
-      <span class="checkpoint-num" id="checkpoint-num">5</span>
-      <span class="checkpoint-label">Level</span>
-    </div>
 
     <!-- Toast for achievement unlocks -->
     <div class="toast" id="toast" hidden role="status" aria-live="polite">
@@ -398,6 +393,6 @@
     <canvas id="share-canvas" width="1080" height="1350" hidden></canvas>
   </main>
 
-  <script src="game.js?v=1.18.1"></script>
+  <script src="game.js?v=1.18.2"></script>
 </body>
 </html>
