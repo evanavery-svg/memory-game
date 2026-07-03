@@ -107,6 +107,7 @@ body {
 
 /* Daily masthead date — a quiet, evenly-spaced caption under the wordmark. */
 .daily-date {
+  animation: hudIn 0.45s var(--ease);
   margin: 6px 0 2px;
   text-align: center;
   font-size: 11px;
@@ -145,9 +146,15 @@ body {
   gap: 8px;
   margin: 26px 0 8px;
   flex-shrink: 0;
+  /* Glides in when a game starts (restarts each time hidden is removed). */
+  animation: hudIn 0.45s var(--ease);
 }
 .hud[hidden] {
   display: none;
+}
+@keyframes hudIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .stat {
@@ -196,11 +203,15 @@ body {
   color: var(--ink);
   font-variant-numeric: tabular-nums;
   display: inline-block;
+  /* The multiplier's size is set from JS as the combo climbs — ease between
+     sizes so growth reads as swelling, not jumping. */
+  transition: font-size 0.3s var(--ease);
 }
 
 /* ---------- Next-goal chip ---------- */
 .goal {
   align-self: center;
+  animation: screenFade 0.32s var(--ease); /* soft entrance on unhide */
   margin: 4px 0 0;
   padding: 4px 12px;
   border-radius: 999px;
@@ -446,6 +457,13 @@ body {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   transition: opacity 0.38s var(--ease);
+  /* Backdrop fades in each time the screen opens (the animation restarts when
+     display flips from none), so screens never pop — they settle. */
+  animation: screenFade 0.32s var(--ease);
+}
+@keyframes screenFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 .screen[hidden] {
   display: none;
@@ -1112,6 +1130,10 @@ body {
   flex-shrink: 0;
   min-height: 38px;
   visibility: hidden;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.28s var(--ease), transform 0.28s var(--ease),
+    visibility 0.28s;
 }
 /* Once you hold a token, keep the row's space reserved so it doesn't pop in and
    out between the flash and tap phases and shove the board around. */
@@ -1120,6 +1142,8 @@ body {
 }
 .powerups.show {
   visibility: visible;
+  opacity: 1;
+  transform: translateY(0);
 }
 .power {
   appearance: none;
