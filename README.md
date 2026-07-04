@@ -90,6 +90,10 @@ No build step, no dependencies.
   - **Hard** — quick flash, two lives, a faster ramp.
 - **Dark mode** — automatically follows your device's light/dark setting and
   flips live when the system theme changes. No toggle to manage.
+- **Slate & blue palette** — an optional whole-app recolor (Settings → Color
+  palette): sage paper, deep slate ink, and blue lit tiles, with its own dark
+  mode that inverts to sage-on-slate. One toggle flips it on; turning it off
+  restores the classic black & white exactly.
 - **Accessibility** — a high-contrast option, keyboard focus outlines, live
   status announcements for each round phase, and reduced-motion support.
 - **Sound & haptics** — generated WebAudio tones (no asset files) and vibration

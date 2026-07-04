@@ -1,13 +1,13 @@
 /* Recall service worker — offline-first caching */
-const CACHE = "recall-v55";
+const CACHE = "recall-v56";
 // A separate cache the page and worker both use as a tiny key/value store
 // (the worker can't read localStorage). Kept across activations.
 const META = "recall-meta";
 const ASSETS = [
   "./",
   "./index.html",
-  "./style.css?v=0.5",
-  "./game.js?v=0.5",
+  "./style.css?v=0.6",
+  "./game.js?v=0.6",
   "./manifest.webmanifest",
   "./icons/icon-192.png",
   "./icons/icon-512.png",

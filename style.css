@@ -50,6 +50,53 @@
   --shadow: rgba(0, 0, 0, 0.6);
 }
 
+/* ---------- Slate palette (Settings → Color palette) ----------
+   A full recolor: sage paper, deep slate ink, and a blue accent on lit and
+   cleared tiles. It rides the same light/dark system as the default —
+   light shows slate-on-sage, dark inverts to sage-on-slate — and turning
+   the toggle off returns everything to the classic black & white. */
+:root[data-palette="slate"] {
+  --bg: #babcad;
+  --ink: #1f3238;
+  --muted: #5d6d70;
+  --hairline: #a6a89a;
+  --tile: #aeb0a2;
+  --tile-edge: #9b9d8f;
+  --tile-hover: #a6a89a;
+  --elevated: #c3c5b8;
+  --scrim: rgba(186, 188, 173, 0.7);
+  --shadow: rgba(31, 50, 56, 0.24);
+  --accent: #296dbe;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-palette="slate"]:not([data-theme="light"]) {
+    --bg: #1f3238;
+    --ink: #babcad;
+    --muted: #7c8c8e;
+    --hairline: #2d434b;
+    --tile: #28404a;
+    --tile-edge: #375059;
+    --tile-hover: #2e4750;
+    --elevated: #243b43;
+    --scrim: rgba(31, 50, 56, 0.7);
+    --shadow: rgba(0, 0, 0, 0.5);
+    --accent: #296dbe;
+  }
+}
+:root[data-palette="slate"][data-theme="dark"] {
+  --bg: #1f3238;
+  --ink: #babcad;
+  --muted: #7c8c8e;
+  --hairline: #2d434b;
+  --tile: #28404a;
+  --tile-edge: #375059;
+  --tile-hover: #2e4750;
+  --elevated: #243b43;
+  --scrim: rgba(31, 50, 56, 0.7);
+  --shadow: rgba(0, 0, 0, 0.5);
+  --accent: #296dbe;
+}
+
 * {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;

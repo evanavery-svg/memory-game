@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "0.5";
+  const VERSION = "0.6";
 
   /* ============================================================
      Elements
@@ -57,6 +57,7 @@
       dailyReminder: false,
       accent: "mono", // selected board theme (see THEMES)
       focus: false, // hide score/level/combo during play
+      palette: false, // slate & blue recolor (off = classic black & white)
     },
     readJSON(PREFS_KEY, {})
   );
@@ -552,7 +553,19 @@
     // No data-theme attribute means the CSS prefers-color-scheme rules drive
     // the palette. Just keep the status-bar / browser theme color in sync.
     document.documentElement.removeAttribute("data-theme");
-    themeColorMeta.setAttribute("content", systemDark() ? "#000000" : "#ffffff");
+    const dark = systemDark();
+    themeColorMeta.setAttribute(
+      "content",
+      prefs.palette ? (dark ? "#1f3238" : "#babcad") : dark ? "#000000" : "#ffffff"
+    );
+  }
+  // Slate & blue recolor — a whole-app palette swap driven purely by the
+  // :root[data-palette] variable blocks in the CSS, so removing the attribute
+  // reverts every color to the black & white default.
+  function applyPalette() {
+    if (prefs.palette) document.documentElement.setAttribute("data-palette", "slate");
+    else document.documentElement.removeAttribute("data-palette");
+    applyTheme(); // status-bar color follows the palette
   }
   // Flip live when the phone switches between light and dark.
   window
@@ -2566,6 +2579,7 @@
   initSwitch("adaptive-toggle", "adaptive");
   initSwitch("contrast-toggle", "contrast", applyContrast);
   initSwitch("focus-toggle", "focus", applyFocus);
+  initSwitch("palette-toggle", "palette", applyPalette);
 
   $("archive-link").addEventListener("click", () => {
     renderArchive();
@@ -2814,6 +2828,7 @@
     rollSubtitle();
     applyContrast();
     applyFocus();
+    applyPalette();
     // Everyone starts with only Mono; colored themes are earned through play.
     applyAccent();
     renderThemes();

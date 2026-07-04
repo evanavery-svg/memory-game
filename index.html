@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/icon-180.png" />
   <link rel="icon" href="icons/icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=0.5" />
+  <link rel="stylesheet" href="style.css?v=0.6" />
   <title>Recall</title>
 </head>
 <body>
@@ -173,6 +173,13 @@
         <label class="field-label" style="margin-top:6px">Board theme</label>
         <div class="theme-grid" id="theme-grid" role="group" aria-label="Board theme"></div>
         <p class="field-hint" id="theme-hint">Mono — the classic black &amp; white</p>
+
+        <label class="field-label" style="margin-top:6px">Color palette</label>
+        <div class="row-toggle">
+          <span class="row-label">Slate &amp; blue</span>
+          <button class="switch" id="palette-toggle" role="switch" aria-checked="false" aria-label="Slate and blue palette"><span class="knob"></span></button>
+        </div>
+        <p class="field-hint">Recolors the whole app in slate, sage and blue. Turn it off anytime to go back to black &amp; white.</p>
 
         <label class="field-label" style="margin-top:6px">Notifications</label>
         <div class="row-toggle">
@@ -393,6 +400,6 @@
     <canvas id="share-canvas" width="1080" height="1350" hidden></canvas>
   </main>
 
-  <script src="game.js?v=0.5"></script>
+  <script src="game.js?v=0.6"></script>
 </body>
 </html>
