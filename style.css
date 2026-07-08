@@ -356,6 +356,14 @@ body {
   }
 }
 
+/* Press-down the instant a finger lands — pure compositor transform on the
+   native :active, no JS, no delay. Resolved tiles keep their result animation
+   instead (the :not() guards stop the two from fighting). */
+.board.interactive .tile:not(.correct):not(.wrong):not(.lit):active {
+  transform: scale(0.94);
+  transition-duration: 0.05s; /* fast down; release springs back on the base 0.3s */
+}
+
 .tile.lit {
   background: var(--accent, var(--ink));
   border-color: var(--accent, var(--ink));
@@ -395,6 +403,12 @@ body {
 .tile.missed {
   background: var(--bg);
   border: 1px dashed var(--ink);
+  /* border-style can't transition, so the dashed mark eases in instead. */
+  animation: missIn 0.3s var(--ease);
+}
+@keyframes missIn {
+  from { opacity: 0.3; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 @keyframes shake {
@@ -531,6 +545,20 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* Staggered screen content: children cascade in instead of one monolithic
+   slab. The inner's own slide is disabled so the transforms don't compound.
+   Replays on every open — the display flip restarts the animations. */
+.screen-inner.stagger { animation: none; }
+.screen-inner.stagger > * { animation: screenIn 0.45s var(--ease) backwards; }
+.screen-inner.stagger > :nth-child(2) { animation-delay: 60ms; }
+.screen-inner.stagger > :nth-child(3) { animation-delay: 120ms; }
+.screen-inner.stagger > :nth-child(4) { animation-delay: 170ms; }
+.screen-inner.stagger > :nth-child(5) { animation-delay: 210ms; }
+.screen-inner.stagger > :nth-child(6) { animation-delay: 240ms; }
+.screen-inner.stagger > :nth-child(7) { animation-delay: 270ms; }
+.screen-inner.stagger > :nth-child(8) { animation-delay: 290ms; }
+.screen-inner.stagger > :nth-child(n + 9) { animation-delay: 300ms; }
+
 .screen-title {
   font-size: 28px;
   font-weight: 700;
@@ -560,6 +588,7 @@ body {
 .hero-mark i {
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.18);
+  transition: background 0.5s var(--ease); /* pattern dissolves, not blinks */
 }
 .hero-mark i.on {
   background: var(--bg);
@@ -857,6 +886,7 @@ body {
 .mode-mark i {
   border-radius: 2px;
   background: rgba(255, 255, 255, 0.18);
+  transition: background 0.5s var(--ease);
 }
 .mode-mark i.on {
   background: var(--bg);
@@ -1526,6 +1556,7 @@ body {
 .a2hs-mark i {
   border-radius: 3px;
   background: rgba(255, 255, 255, 0.18);
+  transition: background 0.5s var(--ease);
 }
 .a2hs-mark i.on {
   background: var(--bg);
@@ -1697,7 +1728,7 @@ body {
   cursor: pointer;
   display: grid;
   place-items: center;
-  transition: transform 0.15s var(--ease);
+  transition: transform 0.15s var(--ease), box-shadow 0.25s var(--ease);
 }
 .swatch:active {
   transform: scale(0.9);

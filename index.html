@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/icon-180.png" />
   <link rel="icon" href="icons/icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=0.6" />
+  <link rel="stylesheet" href="style.css?v=0.7" />
   <title>Recall</title>
 </head>
 <body>
@@ -203,7 +203,7 @@
 
     <!-- ===== Stats screen ===== -->
     <section class="screen" id="stats-screen" hidden>
-      <div class="screen-inner">
+      <div class="screen-inner stagger">
         <h2 class="screen-title">Stats</h2>
 
         <!-- Streak banner -->
@@ -331,7 +331,7 @@
 
     <!-- ===== End screen ===== -->
     <section class="screen" id="end-screen" hidden>
-      <div class="screen-inner">
+      <div class="screen-inner stagger">
         <p class="end-kicker" id="end-kicker">Game over</p>
         <h2 class="end-score" id="end-score">0</h2>
         <p class="end-detail" id="end-detail">Level 1</p>
@@ -400,6 +400,6 @@
     <canvas id="share-canvas" width="1080" height="1350" hidden></canvas>
   </main>
 
-  <script src="game.js?v=0.6"></script>
+  <script src="game.js?v=0.7"></script>
 </body>
 </html>

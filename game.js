@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "0.6";
+  const VERSION = "0.7";
 
   /* ============================================================
      Elements
@@ -641,7 +641,13 @@
           prefs.accent = t.id;
           savePrefs();
           applyAccent();
-          renderThemes();
+          // Move the ring in place (no rebuild) so its transition plays.
+          [...grid.children].forEach((btn, i) =>
+            btn.classList.toggle("selected", THEMES[i].id === t.id)
+          );
+          setThemeHint(
+            t.id === "mono" ? "Mono — the classic black & white" : t.name
+          );
           vibrate(8);
         } else {
           setThemeHint(`${t.name} — ${t.need.label}`);
@@ -717,10 +723,58 @@
     return s + "s";
   }
   function bump(el) {
+    if (prefersReducedMotion()) return; // WAAPI ignores the CSS motion override
     el.animate(
       [{ transform: "scale(1)" }, { transform: "scale(1.18)" }, { transform: "scale(1)" }],
       { duration: 500, easing: "cubic-bezier(0.34, 1.56, 0.64, 1)" }
     );
+  }
+  // Prompt text rides a short fade/rise so the central feedback line never
+  // hard-cuts. The text itself changes synchronously — motion is cosmetic.
+  // `pop` is the springy variant for the "your turn" beat.
+  function setPrompt(text, pop) {
+    if (promptEl.textContent === text) return;
+    promptEl.textContent = text;
+    if (prefersReducedMotion()) return;
+    promptEl.animate(
+      pop
+        ? [
+            { opacity: 0.4, transform: "scale(0.94)" },
+            { opacity: 1, transform: "scale(1)" },
+          ]
+        : [
+            { opacity: 0, transform: "translateY(4px)" },
+            { opacity: 1, transform: "translateY(0)" },
+          ],
+      {
+        duration: pop ? 320 : 240,
+        easing: pop
+          ? "cubic-bezier(0.34, 1.56, 0.64, 1)"
+          : "cubic-bezier(0.22, 1, 0.36, 1)",
+      }
+    );
+  }
+  // End-screen score counts up and lands exactly on the final value. Jumps
+  // straight there under reduced motion or if the screen closes mid-count.
+  function countUp(el, to, ms = 700) {
+    to = Number(to) || 0;
+    if (prefersReducedMotion() || to <= 0) {
+      el.textContent = to;
+      return;
+    }
+    const t0 = performance.now();
+    const tick = (now) => {
+      if (screens.end.hidden) {
+        el.textContent = to;
+        return;
+      }
+      const p = Math.min(1, (now - t0) / ms);
+      el.textContent = Math.round(to * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) requestAnimationFrame(tick);
+      else el.textContent = to;
+    };
+    el.textContent = 0;
+    requestAnimationFrame(tick);
   }
   // Score juice: float "+N" up from the board on every clear. Bigger combos get
   // slightly bigger type, so a hot streak visibly escalates.
@@ -747,10 +801,11 @@
       comboX.textContent = "×" + state.combo;
       // The multiplier grows with the streak — ×9 should look hot.
       comboX.style.fontSize = `${Math.min(12 + state.combo * 1.2, 23)}px`;
-      comboX.animate(
-        [{ transform: "scale(1)" }, { transform: "scale(1.5)" }, { transform: "scale(1)" }],
-        { duration: 450, easing: "cubic-bezier(0.34, 1.56, 0.64, 1)" }
-      );
+      if (!prefersReducedMotion())
+        comboX.animate(
+          [{ transform: "scale(1)" }, { transform: "scale(1.5)" }, { transform: "scale(1)" }],
+          { duration: 450, easing: "cubic-bezier(0.34, 1.56, 0.64, 1)" }
+        );
     } else {
       comboEl.classList.remove("show");
     }
@@ -788,7 +843,14 @@
       el.hidden = true;
       return;
     }
-    el.textContent = `${g.remaining} to ${g.name}`;
+    const next = `${g.remaining} to ${g.name}`;
+    // A visible chip fades its text change; the entrance already animates.
+    if (!el.hidden && el.textContent !== next && !prefersReducedMotion())
+      el.animate([{ opacity: 0.25 }, { opacity: 1 }], {
+        duration: 300,
+        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+      });
+    el.textContent = next;
     el.hidden = false;
   }
   function renderLives() {
@@ -804,12 +866,22 @@
       return;
     }
     timerSpan = null;
-    livesEl.innerHTML = "";
-    for (let i = 0; i < state.maxLives; i++) {
-      const dot = document.createElement("span");
-      dot.className = "life" + (i >= state.lives ? " lost" : "");
-      livesEl.appendChild(dot);
+    // Rebuild only when the dot count changes (new game / mode switch);
+    // otherwise toggle .lost in place so the spring transition actually plays.
+    const dotsOk =
+      livesEl.children.length === state.maxLives &&
+      livesEl.firstElementChild?.classList.contains("life");
+    if (!dotsOk) {
+      livesEl.innerHTML = "";
+      for (let i = 0; i < state.maxLives; i++) {
+        const dot = document.createElement("span");
+        dot.className = "life";
+        livesEl.appendChild(dot);
+      }
     }
+    [...livesEl.children].forEach((dot, i) =>
+      dot.classList.toggle("lost", i >= state.lives)
+    );
   }
 
   let boardSize = 3; // current grid dimension, for gap-snapping input
@@ -908,14 +980,14 @@
     }
 
     renderHUD();
-    promptEl.textContent = "Memorize";
+    setPrompt("Memorize");
 
     await wait(420);
     if (!state.playing) return;
 
     if (ordered) {
       // Sequence mode: flash each tile one at a time, in order.
-      promptEl.textContent = "Watch the order";
+      setPrompt("Watch the order");
       const stepOn = clamp(560 - state.level * 12, 280, 560);
       for (let k = 0; k < state.order.length; k++) {
         if (!state.playing) return;
@@ -939,9 +1011,12 @@
 
     await wait(240);
     if (!state.playing) return;
-    promptEl.textContent = ordered
-      ? `Tap the order — ${state.order.length}`
-      : `Tap ${state.target.size} tile${state.target.size > 1 ? "s" : ""}`;
+    setPrompt(
+      ordered
+        ? `Tap the order — ${state.order.length}`
+        : `Tap ${state.target.size} tile${state.target.size > 1 ? "s" : ""}`,
+      true // the "go" beat gets the springy pop
+    );
     boardEl.classList.add("interactive");
     state.locked = false;
     renderPowerups();
@@ -1042,12 +1117,11 @@
     const bonus = state.mode !== "versus" && Math.random() < SNAKE_CHANCE;
 
     if (granted) {
-      promptEl.textContent = "Power-up earned";
+      setPrompt("Power-up earned");
       // Let the win arpeggio breathe, then a soft pickup lift marks the reward.
       setTimeout(() => { if (state.playing) sfx.earn(); }, 420);
     } else {
-      promptEl.textContent =
-        state.combo >= 2 ? `Perfect · ×${state.combo}` : "Perfect";
+      setPrompt(state.combo >= 2 ? `Perfect · ×${state.combo}` : "Perfect");
     }
     if (bonus) {
       setTimeout(() => {
@@ -1077,7 +1151,7 @@
       state.timeLeft = Math.max(0, state.timeLeft - MODES[state.mode].wrongPenalty);
       renderLives();
       renderHUD();
-      promptEl.textContent = `−${MODES[state.mode].wrongPenalty}s`;
+      setPrompt(`−${MODES[state.mode].wrongPenalty}s`);
       // Don't lock the board here: only the tapped tile itself is inert (its
       // "wrong" class already blocks re-taps in onTileClick) — other tiles stay
       // live so a burst of fast taps never gets silently swallowed.
@@ -1086,7 +1160,7 @@
         // Only restore the tally prompt if the round's still in play — a miss
         // that lands just before the round/game ends shouldn't stomp that text.
         if (state.playing && state.timeLeft > 0 && boardEl.classList.contains("interactive")) {
-          promptEl.textContent = `Tap ${state.target.size - state.found.size} more`;
+          setPrompt(`Tap ${state.target.size - state.found.size} more`);
         }
       }, 480);
       return;
@@ -1098,12 +1172,11 @@
       gameOver();
       return;
     }
-    promptEl.textContent =
-      state.lives === 1 ? "Last life — careful" : "Missed one";
+    setPrompt(state.lives === 1 ? "Last life — careful" : "Missed one");
     setTimeout(() => {
       wrongTile.classList.remove("wrong");
       if (state.playing && state.lives > 0 && boardEl.classList.contains("interactive")) {
-        promptEl.textContent = `Tap ${state.target.size - state.found.size} more`;
+        setPrompt(`Tap ${state.target.size - state.found.size} more`);
       }
     }, 700);
   }
@@ -1131,8 +1204,15 @@
   function renderPowerups() {
     peekBtn.hidden = state.peek <= 0;
     skipBtn.hidden = state.skip <= 0;
-    peekN.textContent = state.peek;
-    skipN.textContent = state.skip;
+    // Bump a button only when its count actually changes (this runs each round).
+    if (peekN.textContent !== String(state.peek)) {
+      peekN.textContent = state.peek;
+      if (state.peek > 0 && !peekBtn.hidden) bump(peekBtn);
+    }
+    if (skipN.textContent !== String(state.skip)) {
+      skipN.textContent = state.skip;
+      if (state.skip > 0 && !skipBtn.hidden) bump(skipBtn);
+    }
     const hasTokens = state.peek > 0 || state.skip > 0;
     powerupsEl.classList.toggle("reserved", hasTokens);
     powerupsEl.classList.toggle("show", hasTokens && !state.locked && state.playing);
@@ -1170,16 +1250,18 @@
       // Re-flash the tiles not yet found.
       const reveal = [...state.target].filter((i) => !state.found.has(i));
       for (const i of reveal) tileAt(i).classList.add("lit");
-      promptEl.textContent = "Peek";
+      setPrompt("Peek");
       await wait(680);
       if (!state.playing) return;
       for (const i of reveal) tileAt(i).classList.remove("lit");
     }
 
     if (MODES[state.mode].timed) resumeTimer();
-    promptEl.textContent = MODES[state.mode].ordered
-      ? `Tap the order — ${state.order.length - state.seqStep} left`
-      : `Tap ${state.target.size - state.found.size} more`;
+    setPrompt(
+      MODES[state.mode].ordered
+        ? `Tap the order — ${state.order.length - state.seqStep} left`
+        : `Tap ${state.target.size - state.found.size} more`
+    );
     state.locked = wasLocked;
     renderPowerups();
   }
@@ -1323,6 +1405,7 @@
     if (grow) {
       snake.score += 1;
       $("snake-score").textContent = snake.score;
+      bump($("snake-score"));
       sfx.correct(snake.score);
       placeFood();
       snake.tick = Math.max(110, snake.tick - 16); // starts slow, quickens each bite
@@ -1711,25 +1794,31 @@
     for (const t of boardEl.children)
       t.classList.remove("wrong", "correct", "missed", "pop", "lit");
     await wait(260);
+    // Sweep tile by tile rather than all at once; the step is capped so the
+    // whole reveal never adds more than ~360ms per phase, whatever the pattern.
+    const targets = [...state.target].sort((a, b) => a - b);
+    const step = prefersReducedMotion()
+      ? 0
+      : Math.min(45, Math.round(360 / Math.max(1, targets.length)));
     // The whole pattern lights up — here's what the board was.
-    for (const idx of state.target) {
-      const t = tileAt(idx);
-      if (t) t.classList.add("lit");
-    }
     sfx.flash();
+    for (const idx of targets) {
+      tileAt(idx)?.classList.add("lit");
+      if (step) await wait(step);
+    }
     await wait(720);
-    // Now separate the hits from the misses.
-    for (const idx of state.target) {
+    // Now separate the hits from the misses, in the same sweep.
+    for (const idx of targets) {
       const t = tileAt(idx);
-      if (!t) continue;
-      t.classList.remove("lit");
-      t.classList.add(state.found.has(idx) ? "correct" : "missed");
+      if (t) {
+        t.classList.remove("lit");
+        t.classList.add(state.found.has(idx) ? "correct" : "missed");
+      }
+      if (step) await wait(step);
     }
     const missedCount = state.target.size - state.found.size;
     if (missedCount > 0)
-      promptEl.textContent = `You missed ${missedCount} tile${
-        missedCount > 1 ? "s" : ""
-      }`;
+      setPrompt(`You missed ${missedCount} tile${missedCount > 1 ? "s" : ""}`);
     await wait(1250);
     // If the player bailed to the menu mid-replay, don't pop the end screen.
     if (screens.home.hidden) showEndScreen(result);
@@ -1739,15 +1828,23 @@
      Screens
      ============================================================ */
   function showScreen(name) {
+    const target = screens[name];
+    // The outgoing screen fades away over the incoming one (they share a
+    // z-index, and .closing is pointer-inert) — navigation reads as a
+    // crossfade instead of a hard cut.
     Object.values(screens).forEach((s) => {
-      s.hidden = true;
-      s.classList.remove("closing");
+      if (s !== target && !s.hidden) closeScreen(s);
     });
-    screens[name].hidden = false;
+    clearTimeout(target._closeTimer);
+    target.classList.remove("closing");
+    target.hidden = false;
   }
   function closeScreen(s) {
+    if (s.hidden) return;
     s.classList.add("closing");
-    setTimeout(() => {
+    // Per-element timer so a quick reopen isn't hidden by a stale timeout.
+    clearTimeout(s._closeTimer);
+    s._closeTimer = setTimeout(() => {
       s.hidden = true;
       s.classList.remove("closing");
     }, 380);
@@ -2015,7 +2112,6 @@
 
   function showEndScreen(r) {
     let kicker = r.mode === "sprint" ? "Time’s up" : "Game over";
-    $("end-score").textContent = r.score;
     const detail =
       r.mode === "sprint"
         ? `Level ${r.level} reached`
@@ -2074,6 +2170,8 @@
     $("again-btn").textContent =
       r.mode === "daily" && !r.archive ? "Back to home" : "Play again";
     showScreen("end");
+    // After the screen is visible, so the count-up's hidden-bail doesn't trip.
+    countUp($("end-score"), r.score);
   }
 
   /* ============================================================
@@ -2920,9 +3018,17 @@
   // briefly, then let it float down. The mode bar only appears once the float
   // has fully completed.
   function enterModes() {
-    // Ignore a double-tap on Play (or Enter) once the transition is underway.
-    if (state.playing || !screens.modes.hidden) return;
+    // Ignore a double-tap on Play (or Enter) once the transition is underway —
+    // but a modes screen that's merely fading out (just left via Home) counts
+    // as closed, so Play isn't dead for the 380ms close window.
     const screen = screens.modes;
+    if (
+      state.playing ||
+      (!screen.hidden && !screen.classList.contains("closing"))
+    )
+      return;
+    clearTimeout(screen._closeTimer); // cancel a fade-out in progress
+    screen.classList.remove("closing");
     const quote = $("modes-quote");
     paintQuote();
     quoteIdx++; // next run gets the next quote
