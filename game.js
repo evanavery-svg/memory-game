@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "0.7";
+  const VERSION = "0.8";
 
   /* ============================================================
      Elements
@@ -152,7 +152,7 @@
     versus: {
       label: "Level",
       timed: false,
-      hint: "Two players, same boards — take turns; the higher score wins.",
+      hint: "Two players trade turns board by board — same boards, higher score wins.",
     },
   };
 
@@ -701,7 +701,9 @@
   // Shift the adaptive offset: clean rounds make it a touch harder, misses ease
   // it back. Bounded so it can't run away.
   function adapt(delta) {
-    if (!prefs.adaptive) return;
+    // Frozen in versus: one player's misses must never change the other's
+    // flash time on the same board (and a match shouldn't skew solo calib).
+    if (!prefs.adaptive || state.mode === "versus") return;
     stats.calib = clamp(stats.calib + delta, -500, 700);
   }
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -950,6 +952,10 @@
      Round flow
      ============================================================ */
   async function startRound() {
+    // Versus: the board is a pure function of the level, so both players see
+    // the identical lit set regardless of turn interleaving or power-up use.
+    if (state.mode === "versus")
+      state.rng = mulberry32((state.vs.seed + state.level) | 0);
     const { gridSize, lit, flashMs } = boardSpec(state.level);
     const ordered = MODES[state.mode].ordered;
     state.locked = true;
@@ -1132,7 +1138,9 @@
       }, 700);
     } else {
       setTimeout(() => {
-        if (state.playing) startRound();
+        if (!state.playing) return;
+        if (state.mode === "versus") versusTurnEnded(true);
+        else startRound();
       }, 820);
     }
   }
@@ -1519,28 +1527,41 @@
   }
 
   /* ============================================================
-     Two-player (pass-and-play). Both players face the same seeded boards;
-     highest score wins. No Snake interludes here.
+     Two-player (pass-and-play). Players alternate turns board-by-board on
+     identical seeded boards — a turn is one board attempt (clear it, or lose
+     your lives and you're out). Going first alternates each level, so the
+     device passes once per level. When one player is out the other plays on
+     solo; the higher final score wins. No Snake interludes here.
      ============================================================ */
-  function startVersusPlayer(n) {
-    state.vs.player = n;
-    state.level = 1;
-    state.score = 0;
-    state.combo = 1;
-    state.bestCombo = 1;
-    state.taps = 0;
-    state.hits = 0;
+  // Each player's run state lives in a context object and is swapped into the
+  // flat `state` for their turn. Combo continuity per player matters — it
+  // drives scoring and power-up thresholds.
+  const VS_FIELDS = [
+    "score", "lives", "combo", "bestCombo", "taps", "hits", "peek", "skip", "level",
+  ];
+  function saveVsCtx() {
+    const c = state.vs.p[state.vs.turn];
+    for (const f of VS_FIELDS) c[f] = state[f];
+  }
+  function loadVsCtx(i) {
+    const c = state.vs.p[i];
+    for (const f of VS_FIELDS) state[f] = c[f];
+  }
+
+  function startVersusTurn(i) {
+    const vs = state.vs;
+    vs.turn = i;
+    vs.phase = null;
+    loadVsCtx(i);
     state.roundMisses = 0;
-    state.lives = state.maxLives;
-    state.peek = 0;
-    state.skip = 0;
     state.usedSkip = false;
     state.usedPeek = false;
     state.playing = true;
     state.locked = true;
-    // Same seed for both players → identical boards, a fair head-to-head.
-    state.rng = mulberry32(state.vs.seed);
-    dailyDateEl.textContent = `Player ${n}`;
+    // Pre-sync the counters so renderPowerups doesn't "earned"-bump on a swap.
+    peekN.textContent = String(state.peek);
+    skipN.textContent = String(state.skip);
+    dailyDateEl.textContent = `Player ${i + 1}`;
     dailyDateEl.hidden = false;
     $("versus-screen").hidden = true;
     powerupsEl.classList.remove("show", "reserved");
@@ -1549,29 +1570,72 @@
     startRound();
   }
 
-  function versusRunEnded() {
+  // Next turn: the alive player with the lowest pending level; tie → that
+  // level's opener (odd levels open with P1, even with P2). This one rule
+  // yields P1,P2 · P2,P1 · P1,P2 … and collapses to solo play once someone
+  // is eliminated.
+  function nextVsTurn() {
+    const alive = [0, 1].filter((k) => state.vs.p[k].alive);
+    if (alive.length === 0) return -1;
+    if (alive.length === 1) return alive[0];
+    const [a, b] = [state.vs.p[0].level, state.vs.p[1].level];
+    if (a !== b) return a < b ? 0 : 1;
+    return a % 2 === 1 ? 0 : 1;
+  }
+
+  // One board attempt just ended — cleared (level already advanced by
+  // roundWon) or lost (lives ran out). Save the context, pick who's next.
+  function versusTurnEnded(cleared) {
     const vs = state.vs;
-    vs.scores[vs.player - 1] = state.score;
-    vs.levels[vs.player - 1] = state.level;
-    dailyDateEl.hidden = true;
-    if (vs.player === 1) {
-      vs.phase = "handoff";
-      $("versus-kicker").textContent = "Player 1 done";
-      $("versus-title").textContent = "Pass the device";
-      $("versus-detail").textContent = `Player 1 scored ${vs.scores[0]} · level ${vs.levels[0]}`;
-      $("versus-next").textContent = "Player 2, go";
-      $("versus-home").hidden = true;
-    } else {
-      vs.phase = "result";
-      const [s1, s2] = vs.scores;
-      $("versus-kicker").textContent = "Result";
-      $("versus-title").textContent =
-        s1 === s2 ? "It's a tie!" : s1 > s2 ? "Player 1 wins!" : "Player 2 wins!";
-      $("versus-detail").textContent = `P1 ${s1} · L${vs.levels[0]}     P2 ${s2} · L${vs.levels[1]}`;
-      $("versus-next").textContent = "Rematch";
-      $("versus-home").hidden = false;
-      sfx.win();
+    const i = vs.turn;
+    saveVsCtx(); // on a loss, ctx.level is the level they died on
+    if (!cleared) vs.p[i].alive = false;
+
+    const next = nextVsTurn();
+    if (next === -1) {
+      showVersusResult();
+      return;
     }
+    if (next === i) {
+      startRound(); // same player continues — no handoff at level boundaries
+      return;
+    }
+
+    // Different player: pass the device.
+    vs.pending = next;
+    vs.phase = "handoff";
+    state.locked = true;
+    boardEl.classList.remove("interactive");
+    hidePowerups();
+    dailyDateEl.hidden = true;
+    if (cleared) {
+      $("versus-kicker").textContent = `Level ${vs.p[next].level}`;
+      $("versus-title").textContent = `Pass to Player ${next + 1}`;
+      $("versus-detail").textContent = `P1 ${vs.p[0].score} · P2 ${vs.p[1].score}`;
+    } else {
+      $("versus-kicker").textContent = `Player ${i + 1} out`;
+      $("versus-title").textContent = "Pass the device";
+      $("versus-detail").textContent =
+        `Player ${i + 1} finished with ${vs.p[i].score} · level ${vs.p[i].level}`;
+    }
+    $("versus-next").textContent = `Player ${next + 1}, go`;
+    $("versus-home").hidden = true;
+    $("versus-screen").hidden = false;
+  }
+
+  function showVersusResult() {
+    const vs = state.vs;
+    vs.phase = "result";
+    dailyDateEl.hidden = true;
+    const [s1, s2] = [vs.p[0].score, vs.p[1].score];
+    $("versus-kicker").textContent = "Result";
+    $("versus-title").textContent =
+      s1 === s2 ? "It's a tie!" : s1 > s2 ? "Player 1 wins!" : "Player 2 wins!";
+    $("versus-detail").textContent =
+      `P1 ${s1} · L${vs.p[0].level}     P2 ${s2} · L${vs.p[1].level}`;
+    $("versus-next").textContent = "Rematch";
+    $("versus-home").hidden = false;
+    sfx.win();
     $("versus-screen").hidden = false;
   }
 
@@ -1702,14 +1766,20 @@
 
     // Two-player: set up a shared-seed match and hand the first turn to Player 1.
     if (state.mode === "versus") {
+      const ctx = () => ({
+        score: 0, lives: state.maxLives, combo: 1, bestCombo: 1,
+        taps: 0, hits: 0, peek: 0, skip: 0,
+        level: 1, // next level this player will attempt
+        alive: true,
+      });
       state.vs = {
-        seed: (Math.random() * 1e9) | 0,
-        player: 1,
-        scores: [0, 0],
-        levels: [0, 0],
-        phase: null,
+        seed: (Math.random() * 1e9) | 0, // shared → identical boards per level
+        p: [ctx(), ctx()],
+        turn: 0,
+        pending: 0,
+        phase: null, // null | "handoff" | "result"
       };
-      startVersusPlayer(1);
+      startVersusTurn(0);
       return;
     }
 
@@ -1726,9 +1796,10 @@
     boardEl.classList.remove("interactive");
     sfx.over();
 
-    // Two-player runs stay out of the single-player stats; hand off instead.
+    // Two-player turns stay out of the single-player stats; the turn engine
+    // decides whether the other player continues or the match is over.
     if (state.mode === "versus") {
-      setTimeout(versusRunEnded, 650);
+      setTimeout(() => versusTurnEnded(false), 650);
       return;
     }
 
@@ -2728,7 +2799,7 @@
   $("snake-continue").addEventListener("click", endSnake);
   $("snake-skip").addEventListener("click", endSnake);
   $("versus-next").addEventListener("click", () => {
-    if (state.vs && state.vs.phase === "handoff") startVersusPlayer(2);
+    if (state.vs && state.vs.phase === "handoff") startVersusTurn(state.vs.pending);
     else newGame("versus"); // rematch — a fresh shared seed
   });
   $("versus-home").addEventListener("click", goHome);

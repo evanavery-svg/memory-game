@@ -26,9 +26,11 @@ No build step, no dependencies.
   - **Endless** — clear boards as far as you can. Choosing it asks **1 or 2
     players**:
     - **1 Player** — a normal solo run.
-    - **2 Players** — pass-and-play: both players face the **same seeded boards**,
-      take turns, and the higher score wins, with a handoff screen between turns,
-      a winner at the end, and a one-tap rematch.
+    - **2 Players** — pass-and-play: players alternate turns **board by board**
+      on the **same seeded boards**. A turn is one board — clear it to bank it,
+      or lose your lives and you're out. Going first alternates each level, so
+      the device passes just once per level. When one player is eliminated the
+      other plays on solo; the higher final score wins, with a one-tap rematch.
   - **Daily** — a deterministic seed gives everyone the same boards each day,
     with a spoiler-free, Wordle-style result you can copy and share. One run per
     day — it locks the moment you start (no retries) and resets at midnight local
