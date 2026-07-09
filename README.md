@@ -52,7 +52,10 @@ No build step, no dependencies.
   arrow keys to eat the squares and grow; it starts slow and quickens with every
   bite. **Fill the whole board and your run score doubles.** The first time you
   hit one, it explains itself. A pure bonus otherwise — your lives carry on, and
-  your best Snake score is kept locally. (Not in two-player.)
+  your best Snake score is kept locally. In two-player it can appear too, seeded
+  per level so both players get the identical shot at the same level; there,
+  filling it doubles only that board's points (not the whole match) and doesn't
+  touch your personal Snake best.
 - **Replay what you missed** — on game over the full board you were meant to
   clear flashes back, then marks which tiles you got versus missed, before the
   end screen.

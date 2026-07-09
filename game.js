@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "0.8";
+  const VERSION = "0.9";
 
   /* ============================================================
      Elements
@@ -1118,9 +1118,13 @@
     bump(primaryEl);
     renderCombo();
 
-    // A rare (~1%) Snake interlude instead of the next board.
-    // (Skipped in two-player — that mode is a straight head-to-head.)
-    const bonus = state.mode !== "versus" && Math.random() < SNAKE_CHANCE;
+    // A rare (~1%) Snake interlude instead of moving on. In versus the roll is
+    // seeded per level, so both players get the identical shot at the same
+    // level; filling it there doubles just that board's points (see snakeWin).
+    const bonus =
+      state.mode === "versus"
+        ? versusSnakeRoll(state.level - 1) // level already advanced; use cleared board
+        : Math.random() < SNAKE_CHANCE;
 
     if (granted) {
       setPrompt("Power-up earned");
@@ -1129,19 +1133,18 @@
     } else {
       setPrompt(state.combo >= 2 ? `Perfect · ×${state.combo}` : "Perfect");
     }
+    // What happens once the cleared-board beat (or Snake bonus) is done.
+    const afterBoard = () => {
+      if (!state.playing) return;
+      if (state.mode === "versus") versusTurnEnded(true);
+      else startRound();
+    };
     if (bonus) {
       setTimeout(() => {
-        if (state.playing)
-          startSnake(() => {
-            if (state.playing) startRound();
-          });
+        if (state.playing) startSnake(afterBoard, gained);
       }, 700);
     } else {
-      setTimeout(() => {
-        if (!state.playing) return;
-        if (state.mode === "versus") versusTurnEnded(true);
-        else startRound();
-      }, 820);
+      setTimeout(afterBoard, 820);
     }
   }
 
@@ -1433,9 +1436,14 @@
     snake.running = false;
     if (snake.iv) clearInterval(snake.iv);
     sfx.wrong();
-    const best = Math.max(snakeBest(), snake.score);
-    setSnakeBest(best);
-    $("snake-hint").textContent = `Score ${snake.score} · best ${best}`;
+    // Versus keeps out of your personal Snake record, like the rest of 2-player.
+    if (state.mode === "versus") {
+      $("snake-hint").textContent = `Score ${snake.score} — no bonus this time.`;
+    } else {
+      const best = Math.max(snakeBest(), snake.score);
+      setSnakeBest(best);
+      $("snake-hint").textContent = `Score ${snake.score} · best ${best}`;
+    }
     $("snake-continue").hidden = false;
   }
 
@@ -1446,21 +1454,31 @@
     if (snake.iv) clearInterval(snake.iv);
     snake.food = null;
     renderSnake(); // show the fully-filled board
-    state.score *= 2;
+    // Solo doubles the whole run; versus doubles only the board that triggered
+    // it (so one Snake round can't single-handedly decide a match).
+    if (state.mode === "versus") state.score += snake.bonusGain;
+    else state.score *= 2;
     renderHUD();
     bump(scoreEl);
     sfx.win();
     setTimeout(() => sfx.milestone(), 160);
-    const best = Math.max(snakeBest(), snake.score);
-    setSnakeBest(best);
+    if (state.mode !== "versus") {
+      const best = Math.max(snakeBest(), snake.score);
+      setSnakeBest(best);
+    }
     $("snake-kicker").textContent = "Board cleared!";
-    $("snake-hint").textContent = "Perfect — your score just doubled.";
+    $("snake-hint").textContent =
+      state.mode === "versus"
+        ? "Perfect — this board's points doubled."
+        : "Perfect — your score just doubled.";
     $("snake-continue").hidden = false;
   }
 
   // Show the interlude with an idle board and a Start button — it doesn't begin
   // until the player taps Start (and then doesn't move until the first swipe).
-  function startSnake(onDone) {
+  // bonusGain (versus only): the points earned on the board that triggered this
+  // Snake round — filling the board adds it again, doubling that board's score.
+  function startSnake(onDone, bonusGain) {
     if (!snakeCells) buildSnakeGrid();
     state.snaking = true;
     state.locked = true;
@@ -1477,6 +1495,7 @@
       running: false,
       iv: null,
       onDone,
+      bonusGain: bonusGain || 0,
     };
     placeFood();
     $("snake-score").textContent = "0";
@@ -1531,8 +1550,16 @@
      identical seeded boards — a turn is one board attempt (clear it, or lose
      your lives and you're out). Going first alternates each level, so the
      device passes once per level. When one player is out the other plays on
-     solo; the higher final score wins. No Snake interludes here.
+     solo; the higher final score wins. A rare Snake interlude can appear,
+     seeded per level so both players get the identical shot (see
+     versusSnakeRoll); filling it doubles just that board's points.
      ============================================================ */
+  // Rare Snake roll for versus, seeded per level so both players get the same
+  // shot at the same level. A separate one-off draw — it never touches
+  // state.rng, so the board layouts stay perfectly in sync.
+  function versusSnakeRoll(level) {
+    return mulberry32((state.vs.seed + level * 48611 + 7) | 0)() < SNAKE_CHANCE;
+  }
   // Each player's run state lives in a context object and is swapped into the
   // flat `state` for their turn. Combo continuity per player matters — it
   // drives scoring and power-up thresholds.
