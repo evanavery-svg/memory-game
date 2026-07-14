@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "0.9";
+  const VERSION = "0.9.1";
 
   /* ============================================================
      Elements
@@ -2710,7 +2710,7 @@
     const el = $("hero-sub");
     if (!el) return;
     el.textContent =
-      Math.random() < 0.25
+      Math.random() < 0.05
         ? "Anna, I love you!"
         : "Memory, beautifully simple.";
   }
