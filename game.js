@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "0.9.1";
+  const VERSION = "0.9.2";
 
   /* ============================================================
      Elements
@@ -20,6 +20,7 @@
   const backBtn = $("back-btn");
   const wordmark = $("wordmark");
   const dailyDateEl = $("daily-date");
+  const bestLabel = $("label-best");
   const themeColorMeta = $("theme-color");
   const powerupsEl = $("powerups");
   const peekBtn = $("power-peek");
@@ -717,7 +718,15 @@
     if (MODES[state.mode].timed) primaryEl.textContent = fmtTime(state.timeLeft);
     else primaryEl.textContent = state.level;
     scoreEl.textContent = state.score;
-    bestEl.textContent = stats.best[state.mode] || 0;
+    // A personal best is meaningless mid-match, and versus never writes one —
+    // show the opponent's live score in that slot instead.
+    if (state.mode === "versus" && state.vs) {
+      bestEl.textContent = state.vs.p[1 - state.vs.turn].score;
+      bestLabel.textContent = `Player ${2 - state.vs.turn}`;
+    } else {
+      bestEl.textContent = stats.best[state.mode] || 0;
+      bestLabel.textContent = "Best";
+    }
     renderGoal();
   }
   function fmtTime(s) {
@@ -840,7 +849,8 @@
   function renderGoal() {
     const el = $("goal");
     if (!el) return;
-    const g = state.playing ? nextGoal() : null;
+    // Versus is excluded from achievements, so never dangle progress there.
+    const g = state.playing && state.mode !== "versus" ? nextGoal() : null;
     if (!g) {
       el.hidden = true;
       return;
@@ -972,8 +982,12 @@
     // A small chance each level turns the board colorful. buildBoard() rebuilds
     // the grid each round, so per-tile colors clear on their own — only the
     // board-level class needs toggling. The roll uses Math.random (not the daily
-    // seed) so it never perturbs which tiles are chosen.
-    state.milestone = Math.random() < MILESTONE_CHANCE;
+    // seed) so it never perturbs which tiles are chosen — except in versus,
+    // where it's seeded per level so both players see the same board look.
+    state.milestone =
+      state.mode === "versus"
+        ? mulberry32((state.vs.seed + state.level * 7919 + 3) | 0)() < MILESTONE_CHANCE
+        : Math.random() < MILESTONE_CHANCE;
     boardEl.classList.toggle("milestone", state.milestone);
     if (state.milestone) {
       let ci = 0;
@@ -1136,7 +1150,8 @@
     // What happens once the cleared-board beat (or Snake bonus) is done.
     const afterBoard = () => {
       if (!state.playing) return;
-      if (state.mode === "versus") versusTurnEnded(true);
+      // state.vs is nulled by goHome — bail if the match was abandoned.
+      if (state.mode === "versus") { if (state.vs) versusTurnEnded(true); }
       else startRound();
     };
     if (bonus) {
@@ -1826,7 +1841,9 @@
     // Two-player turns stay out of the single-player stats; the turn engine
     // decides whether the other player continues or the match is over.
     if (state.mode === "versus") {
-      setTimeout(() => versusTurnEnded(false), 650);
+      // Guard the deferred handoff: leaving to the menu in this window nulls
+      // state.vs, and the stale timer would otherwise throw.
+      setTimeout(() => { if (state.vs) versusTurnEnded(false); }, 650);
       return;
     }
 
