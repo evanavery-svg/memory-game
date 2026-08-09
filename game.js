@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "0.9.2";
+  const VERSION = "0.9.3";
 
   /* ============================================================
      Elements
@@ -86,20 +86,35 @@
     },
     readJSON(STATS_KEY, {})
   );
-  // Backfill nested defaults for older saves.
+  // Backfill and sanitize. Anything here can arrive from an older save or a
+  // hand-edited backup, and a single bad field must never brick startup — the
+  // numeric fields feed arithmetic, and the arrays get spread into Math.max.
+  const num = (v, d = 0) => (typeof v === "number" && isFinite(v) ? v : d);
+  const numArray = (v, cap) => {
+    if (!Array.isArray(v)) return [];
+    const clean = v.filter((n) => typeof n === "number" && isFinite(n));
+    return cap && clean.length > cap ? clean.slice(-cap) : clean;
+  };
   stats.streak = Object.assign({ current: 0, longest: 0, last: null }, stats.streak);
+  stats.streak.current = num(stats.streak.current);
+  stats.streak.longest = num(stats.streak.longest);
   stats.best = Object.assign({ endless: 0, expert: 0, sprint: 0, daily: 0, sequence: 0 }, stats.best);
+  for (const k of Object.keys(stats.best)) stats.best[k] = num(stats.best[k]);
+  for (const k of ["gamesPlayed", "totalTaps", "correctTaps", "bestLevel", "bestCombo", "freezes", "calib"])
+    stats[k] = num(stats[k]);
   if (!Array.isArray(stats.playDays)) stats.playDays = [];
   if (!Array.isArray(stats.achievements)) stats.achievements = [];
   if (!Array.isArray(stats.themesUnlocked)) stats.themesUnlocked = [];
-  if (typeof stats.freezes !== "number") stats.freezes = 0;
-  if (!Array.isArray(stats.recentAcc)) stats.recentAcc = [];
+  // Both are spread into Math.max(...) — a non-array throws, and an oversized
+  // one throws RangeError. Cap them at load, not just on push.
+  stats.recent = numArray(stats.recent, 16);
+  stats.recentAcc = numArray(stats.recentAcc, 16);
   if (!Array.isArray(stats.playHours) || stats.playHours.length !== 24)
     stats.playHours = Array(24).fill(0);
+  else stats.playHours = stats.playHours.map((n) => num(n));
   if (!stats.modeAgg || typeof stats.modeAgg !== "object") stats.modeAgg = {};
   if (!stats.dailyScores || typeof stats.dailyScores !== "object")
     stats.dailyScores = {};
-  if (typeof stats.calib !== "number") stats.calib = 0;
 
   function readJSON(key, fallback) {
     try {
@@ -124,6 +139,22 @@
       /* play on without persistence */
     }
   }
+  // Small flags that live outside `stats` (Snake best, one-time tour markers).
+  const lsGet = (k) => {
+    try {
+      return localStorage.getItem(k);
+    } catch {
+      return null;
+    }
+  };
+  const lsSet = (k, v) => {
+    try {
+      if (v === null || v === undefined || v === "") localStorage.removeItem(k);
+      else localStorage.setItem(k, String(v));
+    } catch {
+      /* ignore */
+    }
+  };
 
   /* ============================================================
      Config: modes & difficulty
@@ -202,6 +233,14 @@
     peek: 0,
     skip: 0,
     usedSkip: false,
+    // Generation counters. Async phases (flash waits, reveal replays, deferred
+    // beats) capture these on entry and re-check after every await: `playing`
+    // alone can't tell "still my run" from "a new run already started".
+    runId: 0, // bumped when a run begins or is abandoned
+    roundId: 0, // bumped by every startRound, including a re-flash
+    memorizing: false, // true only while the pattern is being shown
+    startBest: 0, // this mode's record as of run start (roundWon moves the live one)
+    dayKey: null, // the day this run began — a run crossing midnight files here
   };
 
   /* ============================================================
@@ -720,7 +759,10 @@
     scoreEl.textContent = state.score;
     // A personal best is meaningless mid-match, and versus never writes one —
     // show the opponent's live score in that slot instead.
-    if (state.mode === "versus" && state.vs) {
+    // `vs.turn` is only meaningful once this match's contexts exist — on a
+    // rematch newGame renders before rebuilding them, which would otherwise
+    // flash the previous match's opponent score.
+    if (state.mode === "versus" && state.vs && state.vs.matchId === state.runId) {
       bestEl.textContent = state.vs.p[1 - state.vs.turn].score;
       bestLabel.textContent = `Player ${2 - state.vs.turn}`;
     } else {
@@ -961,14 +1003,22 @@
   /* ============================================================
      Round flow
      ============================================================ */
-  async function startRound() {
+  // `reflash` re-shows the pattern already drawn for this level without drawing
+  // a new one — it must not touch state.rng, or a Daily would silently diverge
+  // from everyone else's boards.
+  async function startRound(reflash) {
+    const myRound = ++state.roundId;
+    const myRun = state.runId;
+    // Still this round? Any newer startRound (or a run ending) supersedes us.
+    const mine = () => state.playing && myRound === state.roundId && myRun === state.runId;
     // Versus: the board is a pure function of the level, so both players see
     // the identical lit set regardless of turn interleaving or power-up use.
-    if (state.mode === "versus")
+    if (state.mode === "versus" && !reflash)
       state.rng = mulberry32((state.vs.seed + state.level) | 0);
     const { gridSize, lit, flashMs } = boardSpec(state.level);
     const ordered = MODES[state.mode].ordered;
     state.locked = true;
+    state.memorizing = true;
     state.found = new Set();
     state.seqStep = 0;
     state.usedSkip = false;
@@ -976,18 +1026,20 @@
     hidePowerups();
 
     buildBoard(gridSize);
-    state.order = sampleList(gridSize * gridSize, lit);
-    state.target = new Set(state.order);
+    if (!reflash) {
+      state.order = sampleList(gridSize * gridSize, lit);
+      state.target = new Set(state.order);
 
-    // A small chance each level turns the board colorful. buildBoard() rebuilds
-    // the grid each round, so per-tile colors clear on their own — only the
-    // board-level class needs toggling. The roll uses Math.random (not the daily
-    // seed) so it never perturbs which tiles are chosen — except in versus,
-    // where it's seeded per level so both players see the same board look.
-    state.milestone =
-      state.mode === "versus"
-        ? mulberry32((state.vs.seed + state.level * 7919 + 3) | 0)() < MILESTONE_CHANCE
-        : Math.random() < MILESTONE_CHANCE;
+      // A small chance each level turns the board colorful. buildBoard() rebuilds
+      // the grid each round, so per-tile colors clear on their own — only the
+      // board-level class needs toggling. The roll uses Math.random (not the daily
+      // seed) so it never perturbs which tiles are chosen — except in versus,
+      // where it's seeded per level so both players see the same board look.
+      state.milestone =
+        state.mode === "versus"
+          ? mulberry32((state.vs.seed + state.level * 7919 + 3) | 0)() < MILESTONE_CHANCE
+          : Math.random() < MILESTONE_CHANCE;
+    }
     boardEl.classList.toggle("milestone", state.milestone);
     if (state.milestone) {
       let ci = 0;
@@ -1003,19 +1055,19 @@
     setPrompt("Memorize");
 
     await wait(420);
-    if (!state.playing) return;
+    if (!mine()) return;
 
     if (ordered) {
       // Sequence mode: flash each tile one at a time, in order.
       setPrompt("Watch the order");
       const stepOn = clamp(560 - state.level * 12, 280, 560);
       for (let k = 0; k < state.order.length; k++) {
-        if (!state.playing) return;
+        if (!mine()) return;
         const t = tileAt(state.order[k]);
         t.classList.add("lit");
         sfx.correct(k);
         await wait(stepOn);
-        if (!state.playing) return;
+        if (!mine()) return;
         t.classList.remove("lit");
         await wait(130);
       }
@@ -1024,19 +1076,20 @@
       for (const idx of state.target) tileAt(idx).classList.add("lit");
       if (MODES[state.mode].timed) pauseTimer();
       await wait(flashMs);
-      if (!state.playing) return;
+      if (!mine()) return;
       for (const idx of state.target) tileAt(idx).classList.remove("lit");
       if (MODES[state.mode].timed) resumeTimer();
     }
 
     await wait(240);
-    if (!state.playing) return;
+    if (!mine()) return;
     setPrompt(
       ordered
         ? `Tap the order — ${state.order.length}`
         : `Tap ${state.target.size} tile${state.target.size > 1 ? "s" : ""}`,
       true // the "go" beat gets the springy pop
     );
+    state.memorizing = false; // the pattern is off-screen; a re-flash would be cheating
     boardEl.classList.add("interactive");
     state.locked = false;
     renderPowerups();
@@ -1047,8 +1100,17 @@
     if (state.found.has(index)) return;
     // Belt-and-suspenders against a stray double pointerdown on one press:
     // never process a tile that's already shown its result this round.
-    if (tile.classList.contains("wrong") || tile.classList.contains("correct"))
-      return;
+    if (tile.classList.contains("correct")) return;
+    if (tile.classList.contains("wrong")) {
+      // In Order mode a mis-tapped tile is still a *future* target, and its
+      // "wrong" mark lingers ~700ms — long enough to swallow the correct tap
+      // when its turn comes. Let it through (and clear the stale mark) the
+      // moment it's the expected tile; a stray double-tap never is.
+      const expected =
+        MODES[state.mode].ordered && index === state.order[state.seqStep];
+      if (!expected) return;
+      tile.classList.remove("wrong");
+    }
 
     state.taps++;
 
@@ -1116,9 +1178,9 @@
 
     // Live records so achievements can pop mid-run. Two-player rounds stay out
     // of the single-player books entirely (another person shouldn't set your
-    // bests); archive replays count as skill but never as a mode record.
-    if (state.mode !== "versus") {
-      if (!state.archive && state.score > (stats.best[state.mode] || 0)) {
+    // bests), and archive replays are pure practice — neither writes anything.
+    if (state.mode !== "versus" && !state.archive) {
+      if (state.score > (stats.best[state.mode] || 0)) {
         stats.best[state.mode] = state.score;
         bump(bestEl);
       }
@@ -1163,6 +1225,13 @@
     }
   }
 
+  // The "what's left" tally, worded for the mode you're actually in.
+  function remainingPrompt() {
+    return MODES[state.mode].ordered
+      ? `Tap the order — ${state.order.length - state.seqStep} left`
+      : `Tap ${state.target.size - state.found.size} more`;
+  }
+
   function missed(wrongTile) {
     state.roundMisses = (state.roundMisses || 0) + 1;
     adapt(90); // missed — give a bit more time next round
@@ -1186,7 +1255,7 @@
         // Only restore the tally prompt if the round's still in play — a miss
         // that lands just before the round/game ends shouldn't stomp that text.
         if (state.playing && state.timeLeft > 0 && boardEl.classList.contains("interactive")) {
-          setPrompt(`Tap ${state.target.size - state.found.size} more`);
+          setPrompt(remainingPrompt());
         }
       }, 480);
       return;
@@ -1202,7 +1271,7 @@
     setTimeout(() => {
       wrongTile.classList.remove("wrong");
       if (state.playing && state.lives > 0 && boardEl.classList.contains("interactive")) {
-        setPrompt(`Tap ${state.target.size - state.found.size} more`);
+        setPrompt(remainingPrompt());
       }
     }, 700);
   }
@@ -1283,11 +1352,7 @@
     }
 
     if (MODES[state.mode].timed) resumeTimer();
-    setPrompt(
-      MODES[state.mode].ordered
-        ? `Tap the order — ${state.order.length - state.seqStep} left`
-        : `Tap ${state.target.size - state.found.size} more`
-    );
+    setPrompt(remainingPrompt());
     state.locked = wasLocked;
     renderPowerups();
   }
@@ -1731,8 +1796,9 @@
   /* ============================================================
      Game lifecycle
      ============================================================ */
-  // When set, the next Daily run replays this past date instead of today —
-  // practice only: no lock, no streak/record effects beyond a normal game.
+  // When set, the next Daily run replays this past date instead of today.
+  // Pure practice, as Settings promises: no daily lock, no streak, no records,
+  // no aggregates — the run happens, but nothing about it is written down.
   let archiveDate = null;
 
   function newGame(modeOverride) {
@@ -1748,9 +1814,15 @@
       goHome();
       return;
     }
+    state.runId++; // supersede anything still awaiting from the previous run
     state.archive = archive;
     state.mode = mode;
     state.diff = prefs.difficulty;
+    // Snapshot the record now: roundWon moves the live one mid-run, so reading
+    // it at game over would always look like a tie.
+    state.startBest = stats.best[mode] || 0;
+    // A run that crosses midnight still belongs to the day it started on.
+    state.dayKey = todayKey();
     // Expert skips the gentle early boards and drops you in deep.
     state.level = MODES[state.mode].headStart || 1;
     state.score = 0;
@@ -1780,10 +1852,13 @@
       metaSet("dailyPlayed", todayKey());
     }
 
-    // Record today's play and advance the streak.
-    registerPlay();
-    pushStreakMeta(); // keep the reminder worker's streak info fresh
-    checkAchievements();
+    // Record today's play and advance the streak — but an archive replay is
+    // practice and must not prop up a streak (Settings says as much).
+    if (!state.archive) {
+      registerPlay();
+      pushStreakMeta(); // keep the reminder worker's streak info fresh
+      checkAchievements();
+    }
 
     hudEl.hidden = false;
     comboEl.classList.remove("show");
@@ -1815,6 +1890,7 @@
         alive: true,
       });
       state.vs = {
+        matchId: state.runId, // so renderHUD ignores a previous match's contexts
         seed: (Math.random() * 1e9) | 0, // shared → identical boards per level
         p: [ctx(), ctx()],
         turn: 0,
@@ -1849,42 +1925,47 @@
 
     // Record stats.
     const reachedLevel = state.level; // level you were attempting
-    stats.gamesPlayed++;
-    stats.totalTaps += state.taps;
-    stats.correctTaps += state.hits;
-    stats.bestLevel = Math.max(stats.bestLevel, reachedLevel);
-    stats.bestCombo = Math.max(stats.bestCombo, state.bestCombo);
-    const practice = !!state.archive; // archive replay — no Daily records
-    const prevBest = stats.best[state.mode] || 0; // best before this run
+    // An archive replay is practice, exactly as Settings promises: it touches
+    // no record, no aggregate and no streak. Only the run itself is real.
+    const practice = !!state.archive;
+    const prevBest = state.startBest || 0; // snapshotted at run start
     const isBest = !practice && state.score >= prevBest;
-    if (!practice) stats.best[state.mode] = Math.max(prevBest, state.score);
-    stats.recent.push(state.score);
-    if (stats.recent.length > 16) stats.recent = stats.recent.slice(-16);
 
-    // Per-game accuracy, for the trend sparkline.
-    const acc = state.taps > 0 ? Math.round((state.hits / state.taps) * 100) : 0;
-    stats.recentAcc.push(acc);
-    if (stats.recentAcc.length > 16) stats.recentAcc = stats.recentAcc.slice(-16);
+    if (!practice) {
+      stats.gamesPlayed++;
+      stats.totalTaps += state.taps;
+      stats.correctTaps += state.hits;
+      stats.bestLevel = Math.max(stats.bestLevel, reachedLevel);
+      stats.bestCombo = Math.max(stats.bestCombo, state.bestCombo);
+      stats.best[state.mode] = Math.max(stats.best[state.mode] || 0, state.score);
+      stats.recent.push(state.score);
+      if (stats.recent.length > 16) stats.recent = stats.recent.slice(-16);
 
-    // When you play, for the time-of-day distribution.
-    stats.playHours[new Date().getHours()] += 1;
+      // Per-game accuracy, for the trend sparkline.
+      const acc = state.taps > 0 ? Math.round((state.hits / state.taps) * 100) : 0;
+      stats.recentAcc.push(acc);
+      if (stats.recentAcc.length > 16) stats.recentAcc = stats.recentAcc.slice(-16);
 
-    // Per-mode run aggregate, for average level reached.
-    const agg = (stats.modeAgg[state.mode] = stats.modeAgg[state.mode] || {
-      runs: 0,
-      levelSum: 0,
-    });
-    agg.runs += 1;
-    agg.levelSum += reachedLevel;
+      // When you play, for the time-of-day distribution.
+      stats.playHours[new Date().getHours()] += 1;
 
-    // Daily keeps a per-day score for the weekly strip (real runs only).
-    if (state.mode === "daily" && !practice)
-      stats.dailyScores[todayKey()] = state.score;
+      // Per-mode run aggregate, for average level reached.
+      const agg = (stats.modeAgg[state.mode] = stats.modeAgg[state.mode] || {
+        runs: 0,
+        levelSum: 0,
+      });
+      agg.runs += 1;
+      agg.levelSum += reachedLevel;
 
-    // A clean Sprint = at least one tap and zero wrong taps.
-    const cleanSprint =
-      state.mode === "sprint" && state.taps > 0 && state.hits === state.taps;
-    checkAchievements({ cleanSprint, bestSingle: state.score });
+      // Daily keeps a per-day score for the weekly strip. Filed under the day
+      // the run *started*, so finishing after midnight can't misattribute it.
+      if (state.mode === "daily") stats.dailyScores[state.dayKey || todayKey()] = state.score;
+
+      // A clean Sprint = at least one tap and zero wrong taps.
+      const cleanSprint =
+        state.mode === "sprint" && state.taps > 0 && state.hits === state.taps;
+      checkAchievements({ cleanSprint, bestSingle: state.score });
+    }
     saveStats();
 
     state.lastResult = {
@@ -1906,12 +1987,18 @@
   // Game-over replay: show the full board you were meant to clear, then mark
   // which tiles you got (filled) vs. missed (dashed), before the end screen.
   async function revealMissed(result) {
+    // Snapshot everything up front — this replay outlives the run, and a new
+    // game started underneath it must not have its board stamped by ours.
+    const myRun = state.runId;
+    const mine = () => myRun === state.runId;
+    const targets = [...state.target].sort((a, b) => a - b);
+    const found = new Set(state.found);
     for (const t of boardEl.children)
       t.classList.remove("wrong", "correct", "missed", "pop", "lit");
     await wait(260);
+    if (!mine()) return;
     // Sweep tile by tile rather than all at once; the step is capped so the
     // whole reveal never adds more than ~360ms per phase, whatever the pattern.
-    const targets = [...state.target].sort((a, b) => a - b);
     const step = prefersReducedMotion()
       ? 0
       : Math.min(45, Math.round(360 / Math.max(1, targets.length)));
@@ -1920,23 +2007,27 @@
     for (const idx of targets) {
       tileAt(idx)?.classList.add("lit");
       if (step) await wait(step);
+      if (!mine()) return;
     }
     await wait(720);
+    if (!mine()) return;
     // Now separate the hits from the misses, in the same sweep.
     for (const idx of targets) {
       const t = tileAt(idx);
       if (t) {
         t.classList.remove("lit");
-        t.classList.add(state.found.has(idx) ? "correct" : "missed");
+        t.classList.add(found.has(idx) ? "correct" : "missed");
       }
       if (step) await wait(step);
+      if (!mine()) return;
     }
-    const missedCount = state.target.size - state.found.size;
+    const missedCount = targets.length - found.size;
     if (missedCount > 0)
       setPrompt(`You missed ${missedCount} tile${missedCount > 1 ? "s" : ""}`);
     await wait(1250);
-    // If the player bailed to the menu mid-replay, don't pop the end screen.
-    if (screens.home.hidden) showEndScreen(result);
+    // Only pop the end screen if this run is still the current one — leaving to
+    // the menu (or starting another game) bumps runId and cancels it.
+    if (mine()) showEndScreen(result);
   }
 
   /* ============================================================
@@ -2192,6 +2283,7 @@
 
   function goHome() {
     state.playing = false;
+    state.runId++; // abandon the run: pending reveals/beats must not land
     // Tear down any Snake interlude / versus match that was up.
     if (snake && snake.iv) clearInterval(snake.iv);
     document.removeEventListener("keydown", snakeKey);
@@ -2239,7 +2331,8 @@
     const name = modeLabel(r.mode);
     const eb = $("end-best");
     const eg = $("end-gap");
-    const beat = r.prevBest > 0 && r.score > r.prevBest;
+    // Archive replays never write a record, so they must never claim one.
+    const beat = !r.archive && r.prevBest > 0 && r.score > r.prevBest;
     const gap = r.prevBest - r.score;
     // Within ~10% (min 20 pts) of your best counts as a near-miss.
     const closeToBest =
@@ -2249,7 +2342,7 @@
       eb.textContent = `New ${name} best · +${r.score - r.prevBest}`;
       eb.hidden = false;
       eg.hidden = true;
-    } else if (r.prevBest === 0 && r.score > 0) {
+    } else if (!r.archive && r.prevBest === 0 && r.score > 0) {
       eb.textContent = `Your first ${name} score`;
       eb.hidden = false;
       eg.hidden = true;
@@ -2901,6 +2994,12 @@
       stats.themesUnlocked = [];
       stats.calib = 0;
       stats.dailyDone = null;
+      // The reminder worker keeps its own copies — clear those too, or it will
+      // keep suppressing today's nudge and quoting a streak that's now gone.
+      metaSet("dailyPlayed", "");
+      metaSet("readyNotified", "");
+      metaSet("expiryNotified", "");
+      pushStreakMeta();
       // Cosmetic themes re-lock with the stats that earned them.
       prefs.accent = "mono";
       savePrefs();
@@ -2921,6 +3020,14 @@
       exportedAt: new Date().toISOString(),
       prefs,
       stats,
+      // Progress that lives outside `stats` but is still progress — the Snake
+      // best especially, since Settings promises to save your bests.
+      flags: {
+        snakeBest: snakeBest(),
+        snakeSeen: lsGet(SNAKE_SEEN_KEY),
+        tutorialSeen: lsGet(TUT_KEY),
+        a2hsSeen: lsGet(A2HS_KEY),
+      },
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
       type: "application/json",
@@ -2941,17 +3048,33 @@
     reader.onload = () => {
       try {
         const data = JSON.parse(reader.result);
-        if (data.app !== "recall" || !data.stats)
+        const isObj = (v) => !!v && typeof v === "object" && !Array.isArray(v);
+        if (data.app !== "recall" || !isObj(data.stats))
           throw new Error("Not a Recall backup");
+        // A backup from a future version may hold fields this build would drop
+        // on the next save — better to refuse than to silently truncate it.
+        if (typeof data.version === "number" && data.version > 1) {
+          alert("That backup is from a newer version of Recall. Update the app, then restore it.");
+          return;
+        }
         if (
           !confirm(
             "Restore this backup? It will replace your current stats and settings."
           )
         )
           return;
+        // Field-level shape is normalized by the sanitizer at load, so a stray
+        // bad value degrades to a default instead of poisoning the save.
         localStorage.setItem(STATS_KEY, JSON.stringify(data.stats));
-        if (data.prefs)
+        if (isObj(data.prefs))
           localStorage.setItem(PREFS_KEY, JSON.stringify(data.prefs));
+        if (isObj(data.flags)) {
+          const b = Number(data.flags.snakeBest);
+          if (isFinite(b) && b > 0) lsSet(SNAKE_KEY, Math.floor(b));
+          lsSet(SNAKE_SEEN_KEY, data.flags.snakeSeen);
+          lsSet(TUT_KEY, data.flags.tutorialSeen);
+          lsSet(A2HS_KEY, data.flags.a2hsSeen);
+        }
         location.reload();
       } catch (err) {
         alert("That file isn’t a valid Recall backup.");
@@ -2982,8 +3105,23 @@
   // return. (Kept separate from flash/peek pausing so the two never collide.)
   document.addEventListener("visibilitychange", () => {
     tabHidden = document.hidden;
+    if (document.hidden) {
+      // A call or a lock screen during the flash would burn the pattern with
+      // the display off, leaving an unwinnable board. Remember to re-show it.
+      if (state.playing && state.memorizing) state.missedFlash = true;
+      return;
+    }
     // Coming back after midnight should re-open the Daily on the home screen.
-    if (!document.hidden && !state.playing) syncHomeHints();
+    if (!state.playing) {
+      state.missedFlash = false;
+      syncHomeHints();
+      return;
+    }
+    if (state.missedFlash) {
+      state.missedFlash = false;
+      // Re-show the same pattern (never redraw — that would desync a Daily).
+      startRound(true);
+    }
   });
 
   /* ============================================================
@@ -2995,8 +3133,15 @@
 
   function init() {
     applyTheme();
+    // Fold unknown enum values back to something real. An invalid difficulty
+    // used to throw out of init() (DIFFS[...] is undefined in syncHomeHints),
+    // leaving a permanently blank app with Settings unreachable.
     if (!BAR_MODES.includes(prefs.mode)) {
       prefs.mode = "endless";
+      savePrefs();
+    }
+    if (!DIFFS[prefs.difficulty]) {
+      prefs.difficulty = "standard";
       savePrefs();
     }
     syncSegmented("mode-seg", prefs.mode);
@@ -3068,7 +3213,12 @@
         syncSegmented("mode-seg", "daily");
         syncHomeHints();
         history.replaceState(null, "", location.pathname); // clear the param
-        enterModes();
+        // The reminder exists to get you into today's Daily — so start it,
+        // rather than dropping you on the picker (where Play may be disabled
+        // if it's already done). If it is done, the mode screen is the right
+        // landing spot and explains why.
+        if (dailyDoneToday()) enterModes();
+        else newGame("daily");
       } else {
         showScreen("home");
         maybePromptA2HS();

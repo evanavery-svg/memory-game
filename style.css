@@ -1698,6 +1698,11 @@ body {
   margin: 2px auto 0;
   font-size: 13.5px;
 }
+/* Without this the author-origin `display: block` above beats the UA's
+   [hidden] rule, and the link stays visible on every mode tab. */
+.archive-link[hidden] {
+  display: none;
+}
 .best-list li.archive-day {
   cursor: pointer;
   border-radius: 8px;
